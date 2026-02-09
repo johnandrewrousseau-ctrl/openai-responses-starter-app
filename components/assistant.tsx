@@ -1,24 +1,30 @@
 "use client";
+
 import React from "react";
 import Chat from "./chat";
 import useConversationStore from "@/stores/useConversationStore";
 import { Item, processMessages } from "@/lib/assistant";
+
+/* ASSISTANT_REMOVE_UNUSED_COPY_HELPERS_V1 */
+
 
 export default function Assistant() {
   const { chatMessages, addConversationItem, addChatMessage, setAssistantLoading } =
     useConversationStore();
 
   const handleSendMessage = async (message: string) => {
-    if (!message.trim()) return;
+    const text = (message || "").trim();
+    if (!text) return;
 
     const userItem: Item = {
       type: "message",
       role: "user",
-      content: [{ type: "input_text", text: message.trim() }],
+      content: [{ type: "input_text", text }],
     };
+
     const userMessage: any = {
       role: "user",
-      content: message.trim(),
+      content: text,
     };
 
     try {
@@ -31,15 +37,13 @@ export default function Assistant() {
     }
   };
 
-  const handleApprovalResponse = async (
-    approve: boolean,
-    id: string
-  ) => {
+  const handleApprovalResponse = async (approve: boolean, id: string) => {
     const approvalItem = {
       type: "mcp_approval_response",
       approve,
       approval_request_id: id,
     } as any;
+
     try {
       addConversationItem(approvalItem);
       await processMessages();
@@ -49,7 +53,7 @@ export default function Assistant() {
   };
 
   return (
-    <div className="h-full p-4 w-full bg-white">
+    <div className="h-full w-full bg-white text-stone-900 dark:bg-stone-950 dark:text-stone-100">
       <Chat
         items={chatMessages}
         onSendMessage={handleSendMessage}
@@ -58,3 +62,4 @@ export default function Assistant() {
     </div>
   );
 }
+

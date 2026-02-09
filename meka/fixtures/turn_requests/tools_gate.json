@@ -1,0 +1,6 @@
+{
+  "messages": [
+    { "role": "user", "content": "TEST: tools gate. Reply with: TOOLS_GATE_OK" }
+  ],
+  "toolsState": { "functionsEnabled": true }
+}

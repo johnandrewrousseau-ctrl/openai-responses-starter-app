@@ -1,0 +1,14 @@
+{
+  "messages": [
+    { "role": "user", "content": "TEST: toolsState dev_bypass key. Reply with: DEV_BYPASS_OK" }
+  ],
+  "toolsState": {
+    "fileSearchEnabled": false,
+    "webSearchEnabled": false,
+    "functionsEnabled": false,
+    "googleIntegrationEnabled": false,
+    "mcpEnabled": false,
+    "codeInterpreterEnabled": false,
+    "dev_bypass_active": false
+  }
+}

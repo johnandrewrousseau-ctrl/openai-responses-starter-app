@@ -23,24 +23,33 @@ export default function Main() {
   }, [router, resetConversation]);
 
   return (
-    <div className="flex justify-center h-screen">
-      <div className="w-full md:w-[70%]">
+    <div className="flex justify-center h-screen bg-stone-100 text-stone-900 dark:bg-stone-950 dark:text-stone-100">
+      <div className="w-full md:w-[70%] h-full">
         <Assistant />
       </div>
-      <div className=" hidden md:block w-[30%]">
+
+      <div className="hidden md:block w-[30%] h-full">
         <ToolsPanel />
       </div>
+
       {/* Hamburger menu for small screens */}
       <div className="absolute top-4 right-4 md:hidden">
-        <button onClick={() => setIsToolsPanelOpen(true)}>
+        <button
+          onClick={() => setIsToolsPanelOpen(true)}
+          className="rounded-md border border-stone-200 bg-white p-2 text-stone-900 hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-100 dark:hover:bg-stone-800"
+        >
           <Menu size={24} />
         </button>
       </div>
+
       {/* Overlay panel for ToolsPanel on small screens */}
       {isToolsPanelOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black bg-opacity-30">
-          <div className="w-full bg-white h-full p-4">
-            <button className="mb-4" onClick={() => setIsToolsPanelOpen(false)}>
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/40">
+          <div className="w-full h-full p-4 bg-white dark:bg-stone-950">
+            <button
+              className="mb-4 rounded-md border border-stone-200 bg-white p-2 text-stone-900 hover:bg-stone-50 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-100 dark:hover:bg-stone-800"
+              onClick={() => setIsToolsPanelOpen(false)}
+            >
               <X size={24} />
             </button>
             <ToolsPanel />

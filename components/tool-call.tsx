@@ -1,9 +1,60 @@
+"use client";
 import React from "react";
 
 import { ToolCallItem } from "@/lib/assistant";
 import { BookOpenText, Clock, Globe, Zap, Code2, Download } from "lucide-react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { coy } from "react-syntax-highlighter/dist/esm/styles/prism";
+
+function mekaNormalizeNewlines(s: string): string {
+  const t = (s ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  return t.replace(/\s+$/g, "") + "\n";
+}
+
+function mekaDetectContamination(s: string): string | null {
+  const t = s ?? "";
+  const checks: Array<[RegExp, string]> = [
+    [/^\s*PS\s+[A-Za-z]:\\.*?>\s*/m, "PowerShell prompt detected (PS C:\\...>)"],
+    [/^\s*[A-Za-z]:\\.*?>\s*/m, "Drive prompt detected (C:\\...>)"],
+    [/^\s*>>\s+/m, "PowerShell continuation prompt detected (>>)"],
+    [/^\s*At line:\d+\s+char:\d+/m, "PowerShell error dump detected (At line:...)"],
+    [/^\s*\+\s+~+/m, "PowerShell caret block detected (+ ~~~)"],
+    [
+      /^\s*(GET|POST|PUT|PATCH|DELETE)\s+\/.*\s+\d{3}\s+in\s+\d+ms\s*$/m,
+      "Server log line detected (GET/POST ... in ...ms)",
+    ],
+    [/^\s*Error:.*$/m, "Error line detected"],
+  ];
+  for (const [re, msg] of checks) {
+    if (re.test(t)) return msg;
+  }
+  return null;
+}
+
+function mekaExtractRunnableRegion(
+  raw: string
+): { ok: true; text: string } | { ok: false; reason: string } {
+  const s = raw ?? "";
+  const re = /###\s*RUN:\s*\r?\n([\s\S]*?)\r?\n###\s*END\s*RUN\s*/m;
+  const m = s.match(re);
+  if (!m) return { ok: false, reason: "Missing sentinels. Use ### RUN: ... ### END RUN" };
+
+  const body = m[1] ?? "";
+  const bad = mekaDetectContamination(body);
+  if (bad) return { ok: false, reason: bad };
+
+  return { ok: true, text: mekaNormalizeNewlines(body) };
+}
+
+async function mekaCopySafe(raw: string): Promise<void> {
+  const out = mekaExtractRunnableRegion(raw);
+  if (!out.ok) {
+    window.alert("Copy blocked: " + out.reason);
+    return;
+  }
+  await navigator.clipboard.writeText(out.text);
+}
+
 
 interface ToolCallProps {
   toolCall: ToolCallItem;
@@ -176,7 +227,17 @@ function CodeInterpreterCell({ toolCall }: ToolCallProps) {
         </div>
         <div className="bg-[#fafafa] rounded-xl py-2 ml-4 mt-2">
           <div className="mx-6 p-2 text-xs">
-            <SyntaxHighlighter
+            <div className="mb-1 flex items-center justify-end">
+  <button
+    type="button"
+    onClick={() => void mekaCopySafe(toolCall.code || "")}
+    className="rounded-md border border-stone-200 bg-white px-2 py-1 text-[11px] font-semibold text-stone-900 hover:bg-stone-50 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100 dark:hover:bg-stone-800/60"
+    title="Copies only text between ### RUN: and ### END RUN. Blocks prompts/logs/errors."
+  >
+    Copy (RUN only)
+  </button>
+</div>
+<SyntaxHighlighter
               customStyle={{
                 backgroundColor: "#fafafa",
                 padding: "8px",

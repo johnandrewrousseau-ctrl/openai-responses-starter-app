@@ -1,0 +1,9 @@
+{
+  "messages": [
+    { "role": "user", "content": "TEST: toolsState strict. Reply with: SHOULD_NOT_RUN" }
+  ],
+  "toolsState": {
+    "functionsEnabled": false,
+    "extra_field": true
+  }
+}

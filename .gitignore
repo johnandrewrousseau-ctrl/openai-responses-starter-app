@@ -40,3 +40,27 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ---- MEKA / local scratch artifacts ----
+_dump_*.json
+_meka_*.json
+meka_fs_dump.json
+*.bak_*
+
+# state (local runtime / request dumps)
+state/
+
+# generated/derived API artifacts
+app/api/vector_store_files/
+
+# MEKA local artifacts
+*.bak.*
+audit.json
+_sse_last.txt
+_meka_guard.ps1
+# MEKA: quarantine backups
+backup/
+**/*.bak.*
+# MEKA: local scratch + logs
+_scratch_*
+logs/

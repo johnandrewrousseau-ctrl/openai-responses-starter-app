@@ -1,0 +1,6 @@
+{
+  "messages": [
+    { "role": "user", "content": "TEST: baseline. Reply with: BASELINE_OK" }
+  ],
+  "toolsState": { "functionsEnabled": false }
+}

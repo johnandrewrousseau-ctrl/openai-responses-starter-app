@@ -53,8 +53,9 @@ export default function FileUpload({
     "text/markdown": [".md"],
     "application/pdf": [".pdf"],
     "text/x-php": [".php"],
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation":
-      [".pptx"],
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": [
+      ".pptx",
+    ],
     "text/x-python": [".py"],
     "text/x-script.python": [".py"],
     "text/x-ruby": [".rb"],
@@ -65,9 +66,7 @@ export default function FileUpload({
   };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      setFile(acceptedFiles[0]);
-    }
+    if (acceptedFiles.length > 0) setFile(acceptedFiles[0]);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -76,16 +75,12 @@ export default function FileUpload({
     accept: acceptedFileTypes,
   });
 
-  const removeFile = () => {
-    setFile(null);
-  };
+  const removeFile = () => setFile(null);
 
   const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
     const bytes = new Uint8Array(buffer);
     let binary = "";
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
+    for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
     return btoa(binary);
   };
 
@@ -100,67 +95,45 @@ export default function FileUpload({
     try {
       const arrayBuffer = await file.arrayBuffer();
       const base64Content = arrayBufferToBase64(arrayBuffer);
-      const fileObject = {
-        name: file.name,
-        content: base64Content,
-      };
+      const fileObject = { name: file.name, content: base64Content };
 
-      // 1. Upload file
+      // 1) Upload file
       const uploadResponse = await fetch("/api/vector_stores/upload_file", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileObject,
-        }),
+        body: JSON.stringify({ fileObject }),
       });
-      if (!uploadResponse.ok) {
-        throw new Error("Error uploading file");
-      }
+      if (!uploadResponse.ok) throw new Error("Error uploading file");
       const uploadData = await uploadResponse.json();
       const fileId = uploadData.id;
-      if (!fileId) {
-        throw new Error("Error getting file ID");
-      }
-      console.log("Uploaded file:", uploadData);
+      if (!fileId) throw new Error("Error getting file ID");
 
       let finalVectorStoreId = vectorStoreId;
 
-      // 2. If no vector store is linked, create one
+      // 2) If no vector store is linked, create one
       if (!vectorStoreId || vectorStoreId === "") {
         const createResponse = await fetch("/api/vector_stores/create_store", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: newStoreName,
-          }),
+          body: JSON.stringify({ name: newStoreName }),
         });
-        if (!createResponse.ok) {
-          throw new Error("Error creating vector store");
-        }
+        if (!createResponse.ok) throw new Error("Error creating vector store");
         const createData = await createResponse.json();
         finalVectorStoreId = createData.id;
       }
 
-      if (!finalVectorStoreId) {
-        throw new Error("Error getting vector store ID");
-      }
+      if (!finalVectorStoreId) throw new Error("Error getting vector store ID");
 
       onAddStore(finalVectorStoreId);
 
-      // 3. Add file to vector store
+      // 3) Add file to vector store
       const addFileResponse = await fetch("/api/vector_stores/add_file", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileId,
-          vectorStoreId: finalVectorStoreId,
-        }),
+        body: JSON.stringify({ fileId, vectorStoreId: finalVectorStoreId }),
       });
-      if (!addFileResponse.ok) {
-        throw new Error("Error adding file to vector store");
-      }
-      const addFileData = await addFileResponse.json();
-      console.log("Added file to vector store:", addFileData);
+      if (!addFileResponse.ok) throw new Error("Error adding file to vector store");
+
       setFile(null);
       setDialogOpen(false);
     } catch (error) {
@@ -171,25 +144,45 @@ export default function FileUpload({
     }
   };
 
+  const triggerCls = [
+    "inline-flex items-center justify-center gap-1 rounded-full px-3 py-1 text-sm font-semibold border transition-colors",
+    "border-stone-200 bg-white text-stone-900 hover:bg-stone-50",
+    "dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:hover:bg-stone-800",
+  ].join(" ");
+
+  const panelTextMuted = "text-stone-600 dark:text-stone-300";
+  const panelText = "text-stone-900 dark:text-stone-100";
+
+  const inputCls = [
+    "border rounded p-2",
+    "bg-white text-stone-900 placeholder:text-stone-400 border-stone-200",
+    "dark:bg-stone-900 dark:text-stone-100 dark:placeholder:text-stone-500 dark:border-stone-700",
+    "focus-visible:ring-0",
+  ].join(" ");
+
   return (
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
       <DialogTrigger asChild>
-        <div className="bg-white rounded-full flex items-center justify-center py-1 px-3 border border-zinc-200 gap-1 font-medium text-sm cursor-pointer hover:bg-zinc-50 transition-all">
+        <button type="button" className={triggerCls}>
           <Plus size={16} />
           Upload
-        </div>
+        </button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px] md:max-w-[600px] max-h-[80vh] overflow-y-scrollfrtdtd">
+
+      <DialogContent className="sm:max-w-[500px] md:max-w-[600px] max-h-[80vh] overflow-y-auto border border-stone-200 bg-white text-stone-900 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Add files to your vector store</DialogTitle>
+            <DialogTitle className="text-stone-900 dark:text-stone-100">
+              Add files to your vector store
+            </DialogTitle>
           </DialogHeader>
+
           <div className="my-6">
             {!vectorStoreId || vectorStoreId === "" ? (
               <div className="flex items-start gap-2 text-sm">
                 <label className="font-medium w-72" htmlFor="storeName">
-                  New vector store name
-                  <div className="text-xs text-zinc-400">
+                  <div className={panelText}>New vector store name</div>
+                  <div className="text-xs text-stone-500 dark:text-stone-400">
                     A new store will be created when you upload a file.
                   </div>
                 </label>
@@ -198,16 +191,16 @@ export default function FileUpload({
                   type="text"
                   value={newStoreName}
                   onChange={(e) => setNewStoreName(e.target.value)}
-                  className="border rounded p-2"
+                  className={inputCls}
                 />
               </div>
             ) : (
               <div className="flex items-center justify-between flex-1 min-w-0">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="text-sm font-medium w-24 text-nowrap">
+                  <div className="text-sm font-medium w-24 text-nowrap text-stone-700 dark:text-stone-300">
                     Vector store
                   </div>
-                  <div className="text-zinc-400  text-xs font-mono flex-1 text-ellipsis truncate">
+                  <div className="text-stone-500 dark:text-stone-400 text-xs font-mono flex-1 text-ellipsis truncate">
                     {vectorStoreId}
                   </div>
                   <TooltipProvider>
@@ -216,11 +209,11 @@ export default function FileUpload({
                         <CircleX
                           onClick={() => onUnlinkStore()}
                           size={16}
-                          className="cursor-pointer text-zinc-400 mb-0.5 shrink-0 mt-0.5 hover:text-zinc-700 transition-all"
+                          className="cursor-pointer text-stone-500 dark:text-stone-400 mb-0.5 shrink-0 mt-0.5 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
                         />
                       </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Unlink vector store</p>
+                      <TooltipContent className="border border-stone-200 bg-white text-stone-900 shadow-sm dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100">
+                        <p className="text-xs">Unlink vector store</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -228,42 +221,56 @@ export default function FileUpload({
               </div>
             )}
           </div>
+
           <div className="flex justify-center items-center mb-4 h-[200px]">
             {file ? (
               <div className="flex flex-col items-start">
-                <div className="text-zinc-400">Loaded file</div>
+                <div className={panelTextMuted}>Loaded file</div>
                 <div className="flex items-center mt-2">
-                  <div className="text-zinc-900 mr-2">{file.name}</div>
-
+                  <div className="mr-2 text-stone-900 dark:text-stone-100">
+                    {file.name}
+                  </div>
                   <Trash2
                     onClick={removeFile}
                     size={16}
-                    className="cursor-pointer text-zinc-900"
+                    className="cursor-pointer text-stone-700 hover:text-stone-900 dark:text-stone-300 dark:hover:text-stone-100"
                   />
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col items-center">
+              <div className="flex flex-col items-center w-full">
                 <div
                   {...getRootProps()}
-                  className="p-6 flex items-center justify-center relative focus-visible:outline-0"
+                  className={[
+                    "w-full rounded-xl border border-dashed p-6",
+                    "border-stone-200 bg-stone-50 hover:bg-stone-100",
+                    "dark:border-stone-700 dark:bg-stone-900/40 dark:hover:bg-stone-900/60",
+                    "flex items-center justify-center relative focus-visible:outline-0 cursor-pointer transition-colors",
+                  ].join(" ")}
                 >
                   <input {...getInputProps()} />
                   <div
-                    className={`absolute rounded-full transition-all duration-300 ${
+                    className={[
+                      "absolute rounded-full transition-all duration-300",
                       isDragActive
-                        ? "h-56 w-56 bg-zinc-100"
-                        : "h-0 w-0 bg-transparent"
-                    }`}
-                  ></div>
-                  <div className="flex flex-col items-center text-center z-10 cursor-pointer">
-                    <FilePlus2 className="mb-4 size-8 text-zinc-700" />
-                    <div className="text-zinc-700">Upload a file</div>
+                        ? "h-56 w-56 bg-stone-200/60 dark:bg-stone-800/60"
+                        : "h-0 w-0 bg-transparent",
+                    ].join(" ")}
+                  />
+                  <div className="flex flex-col items-center text-center z-10">
+                    <FilePlus2 className="mb-4 size-8 text-stone-700 dark:text-stone-200" />
+                    <div className="text-stone-800 dark:text-stone-100 font-medium">
+                      Upload a file
+                    </div>
+                    <div className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+                      Drag & drop or click to choose
+                    </div>
                   </div>
                 </div>
               </div>
             )}
           </div>
+
           <DialogFooter>
             <Button type="submit" disabled={uploading}>
               {uploading ? "Uploading..." : "Add"}

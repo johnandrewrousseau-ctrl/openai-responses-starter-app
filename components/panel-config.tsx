@@ -30,13 +30,16 @@ export default function PanelConfig({
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <h1 className="text-black font-medium">{title}</h1>
+              <h1 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
+                {title}
+              </h1>
             </TooltipTrigger>
-            <TooltipContent>
-              <p>{tooltip}</p>
+            <TooltipContent className="border border-stone-200 bg-white text-stone-900 shadow-sm dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100">
+              <p className="text-xs">{tooltip}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
+
         <Switch
           id={title}
           checked={enabled}
@@ -44,7 +47,8 @@ export default function PanelConfig({
           disabled={disabled}
         />
       </div>
-      <div className="mt-1">{children}</div>
+
+      <div className="mt-1 text-stone-900 dark:text-stone-100">{children}</div>
     </div>
   );
 }

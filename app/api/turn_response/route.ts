@@ -1053,17 +1053,21 @@ function sanitizeVectorStoreIds(ids: any): string[] {
 
 function isCanonModeExplicit(lastUserText: string): boolean {
   if (!lastUserText) return false;
+  const t = lastUserText.toUpperCase();
   return (
-    lastUserText.includes("CANON_QUERY_RUNNER") ||
-    lastUserText.includes("Target: CANON ONLY")
+    t.includes("CANON_QUERY_RUNNER") ||
+    t.includes("CANON_PAK_RUNNER") ||
+    t.includes("TARGET: CANON ONLY")
   );
 }
 
 function isThreadModeExplicit(lastUserText: string): boolean {
   if (!lastUserText) return false;
+  const t = lastUserText.toUpperCase();
   return (
-    lastUserText.includes("THREAD_QUERY_RUNNER") ||
-    lastUserText.includes("Target: THREADS ONLY")
+    t.includes("THREAD_QUERY_RUNNER") ||
+    t.includes("GOLD_HUNT_RUNNER") ||
+    t.includes("TARGET: THREADS ONLY")
   );
 }
 
@@ -1545,6 +1549,16 @@ export async function POST(request: Request) {
 
     const canonModeActive = isCanonModeExplicit(lastUserText);
     const threadModeActive = isThreadModeExplicit(lastUserText);
+    if (canonModeActive && threadModeActive) {
+      return jsonError(
+        400,
+        "mode_conflict",
+        "Ambiguous runner headers: choose CANON or THREADS, not both.",
+        {
+          hint: "Use only one of: CANON_QUERY_RUNNER/CANON_PAK_RUNNER or THREAD_QUERY_RUNNER/GOLD_HUNT_RUNNER.",
+        }
+      );
+    }
     if (canonModeActive && !fileSearchEnabled) {
       return jsonError(
         400,

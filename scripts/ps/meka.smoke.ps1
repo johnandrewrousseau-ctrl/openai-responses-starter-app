@@ -126,6 +126,17 @@ Assert-True ($threadHdr -and $threadHdr.Trim().Length -gt 0) "thread_mode_forces
 $threadHasFileSearch = SseHasFileSearchEvent $resp1thread.Content
 Assert-True ($threadHasFileSearch) "thread_mode_triggers_file_search" "Expected SSE stream to include file_search."
 
+# 1.4) Gold hunt mode forces file_search call/event
+$goldBody = Get-Content (Join-Path $fixtures "gold_hunt_mode.json") -Raw
+$resp1gold = Invoke-TurnResponse -BaseUrl $Base -BodyJson $goldBody
+Assert-True ($resp1gold.StatusCode -eq 200) "gold_hunt_mode_http_200" "Expected 200, got $($resp1gold.StatusCode)"
+
+$goldHdr = $resp1gold.Headers["x-meka-threads-vs"]
+Assert-True ($goldHdr -and $goldHdr.Trim().Length -gt 0) "gold_hunt_mode_forces_threads_vector_store" "Expected x-meka-threads-vs header to be non-empty. Got: [$goldHdr]"
+
+$goldHasFileSearch = SseHasFileSearchEvent $resp1gold.Content
+Assert-True ($goldHasFileSearch) "gold_hunt_mode_triggers_file_search" "Expected SSE stream to include file_search."
+
 # 1.5) toolsState must reject unknown keys
 $extraBody = Get-Content (Join-Path $fixtures "tools_state_extra.json") -Raw
 $resp1b = Invoke-TurnResponse -BaseUrl $Base -BodyJson $extraBody

@@ -1,0 +1,16 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "GOLD_HUNT_RUNNER\nQuestion: Extract the best drift countermeasure mechanisms from my threads."
+    }
+  ],
+  "toolsState": {
+    "fileSearchEnabled": true,
+    "webSearchEnabled": false,
+    "functionsEnabled": false,
+    "googleIntegrationEnabled": false,
+    "mcpEnabled": false,
+    "codeInterpreterEnabled": false
+  }
+}

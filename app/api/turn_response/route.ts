@@ -1544,6 +1544,17 @@ export async function POST(request: Request) {
         { hint: "Set toolsState.fileSearchEnabled=true and retry." }
       );
     }
+    const canonVectorStoreIds = canonModeActive
+      ? sanitizeVectorStoreIds([process.env.MEKA_VECTOR_STORE_ID_CANON])
+      : [];
+    if (canonModeActive && canonVectorStoreIds.length === 0) {
+      return jsonError(
+        400,
+        "canon_mode_requires_canon_vector_store",
+        "Canon mode requires MEKA_VECTOR_STORE_ID_CANON to be set.",
+        { hint: "Set MEKA_VECTOR_STORE_ID_CANON in your .env.local and retry." }
+      );
+    }
 
     // ---------- Phase C1: truth-source policy ----------
     const truthPolicy = resolveTruthSourcePolicy(lastUserText);
@@ -1627,6 +1638,14 @@ export async function POST(request: Request) {
     // Safety: never allow function tools to exist unless the request is authorized.
     if (!toolsOk) {
       tools = tools.filter((t: any) => !(t && typeof t === "object" && (t as any).type === "function"));
+    }
+    if (canonModeActive) {
+      tools = tools.map((t: any) => {
+        if (t && typeof t === "object" && t.type === "file_search") {
+          return { ...t, vector_store_ids: canonVectorStoreIds };
+        }
+        return t;
+      });
     }
 // If we lost all file_search tools due to bad IDs, fail fast with a clear message.
     const hasFileSearch = tools.some((t) => t && typeof t === "object" && (t as any).type === "file_search");
@@ -1721,6 +1740,7 @@ assistantText = finalText;
         headers: {
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
+          ...(canonModeActive ? { "x-meka-canon-vs": canonVectorStoreIds.join(",") } : {}),
         },
       });
     }
@@ -1994,6 +2014,7 @@ assistantText = finalText;
       headers: {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
+        ...(canonModeActive ? { "x-meka-canon-vs": canonVectorStoreIds.join(",") } : {}),
       },
     });
   } catch (error) {
@@ -2006,10 +2027,6 @@ assistantText = finalText;
     );
   }
 }
-
-
-
-
 
 
 

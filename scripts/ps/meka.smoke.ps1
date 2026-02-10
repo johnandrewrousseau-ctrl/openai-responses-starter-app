@@ -109,6 +109,9 @@ $canonBody = Get-Content (Join-Path $fixtures "canon_mode.json") -Raw
 $resp1canon = Invoke-TurnResponse -BaseUrl $Base -BodyJson $canonBody
 Assert-True ($resp1canon.StatusCode -eq 200) "canon_mode_http_200" "Expected 200, got $($resp1canon.StatusCode)"
 
+$canonHdr = $resp1canon.Headers["x-meka-canon-vs"]
+Assert-True ($canonHdr -and $canonHdr.Trim().Length -gt 0) "canon_mode_forces_canon_vector_store" "Expected x-meka-canon-vs header to be non-empty. Got: [$canonHdr]"
+
 $canonHasFileSearch = SseHasFileSearchEvent $resp1canon.Content
 Assert-True ($canonHasFileSearch) "canon_mode_triggers_file_search" "Expected SSE stream to include file_search."
 
@@ -153,4 +156,3 @@ if (-not $token) {
 }
 
 Write-Host "OK: MEKA smoke checks complete."
-

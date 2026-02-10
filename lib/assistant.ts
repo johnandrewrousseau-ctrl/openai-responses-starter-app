@@ -726,6 +726,7 @@ export const processMessages = async () => {
     setChatMessages,
     setConversationItems,
     setAssistantLoading,
+    runMode,
   } = useConversationStore.getState();
 
   const store = useToolsStore.getState() as any;
@@ -740,6 +741,15 @@ export const processMessages = async () => {
       ? { dev_bypass_active: store.dev_bypass_active }
       : {}),
   };
+  const runnerModeActive = runMode && runMode !== "normal";
+  const toolsStateForRunner: ToolsState = runnerModeActive
+    ? {
+        ...toolsState,
+        fileSearchEnabled: true,
+        webSearchEnabled: false,
+        functionsEnabled: false,
+      }
+    : toolsState;
 
   const allConversationItems = conversationItems;
 
@@ -748,7 +758,7 @@ export const processMessages = async () => {
   // For streaming MCP tool call arguments
   let mcpArguments = "";
 
-  await handleTurn(allConversationItems, toolsState, async ({ event, data }) => {
+  await handleTurn(allConversationItems, toolsStateForRunner, async ({ event, data }) => {
     switch (event) {
       case "response.output_text.delta":
       case "response.output_text.annotation.added": {

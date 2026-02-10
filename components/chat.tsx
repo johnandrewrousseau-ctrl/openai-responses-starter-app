@@ -13,7 +13,7 @@ import McpToolsList from "./mcp-tools-list";
 import McpApproval from "./mcp-approval";
 import { Item, McpApprovalRequestItem } from "@/lib/assistant";
 import LoadingMessage from "./loading-message";
-import useConversationStore from "@/stores/useConversationStore";
+import useConversationStore, { RunMode } from "@/stores/useConversationStore";
 import { Mic, MicOff } from "lucide-react";
 
 interface ChatProps {
@@ -29,7 +29,7 @@ const Chat: React.FC<ChatProps> = ({ items, onSendMessage, onApprovalResponse })
 
   const [inputMessageText, setinputMessageText] = useState<string>("");
   const [isComposing, setIsComposing] = useState(false);
-  const { isAssistantLoading } = useConversationStore();
+  const { isAssistantLoading, runMode, setRunMode } = useConversationStore();
 
   // ---- Speech-to-text (Chrome Web Speech API) ----
   const [sttSupported, setSttSupported] = useState(false);
@@ -62,6 +62,20 @@ const Chat: React.FC<ChatProps> = ({ items, onSendMessage, onApprovalResponse })
     const ctor: SpeechRecognitionCtor | undefined = w.SpeechRecognition || w.webkitSpeechRecognition;
     setSttSupported(Boolean(ctor));
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = window.localStorage.getItem("meka.runMode");
+    const v = (raw || "").toLowerCase();
+    const next: RunMode =
+      v === "canon" || v === "threads" || v === "gold" ? (v as RunMode) : "normal";
+    if (next !== runMode) setRunMode(next);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("meka.runMode", runMode);
+  }, [runMode]);
 
   const emitTextbox = (text: string) => setinputMessageText(text);
 
@@ -313,6 +327,40 @@ const Chat: React.FC<ChatProps> = ({ items, onSendMessage, onApprovalResponse })
               <div className="flex w-full flex-col gap-1.5 rounded-[20px] p-2.5 pl-1.5 transition-colors border border-stone-200 dark:border-stone-800 shadow-sm bg-white/70 dark:bg-stone-950/60">
                 <div className="flex items-end gap-1.5 md:gap-2 pl-4">
                   <div className="flex min-w-0 flex-1 flex-col">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <div className="text-[11px] uppercase tracking-wide text-stone-500 dark:text-stone-400">
+                        Mode:{" "}
+                        {runMode === "canon"
+                          ? "Canon"
+                          : runMode === "threads"
+                            ? "Threads"
+                            : runMode === "gold"
+                              ? "Gold Hunt"
+                              : "Normal"}
+                      </div>
+                      <div className="flex items-center gap-1 rounded-full border border-stone-200 bg-white/80 p-0.5 text-[11px] text-stone-700 shadow-sm dark:border-stone-800 dark:bg-stone-950/60 dark:text-stone-200">
+                        {([
+                          ["normal", "Normal"],
+                          ["canon", "Canon"],
+                          ["threads", "Threads"],
+                          ["gold", "Gold Hunt"],
+                        ] as Array<[RunMode, string]>).map(([value, label]) => (
+                          <button
+                            key={value}
+                            type="button"
+                            className={[
+                              "rounded-full px-2.5 py-1 transition-colors",
+                              runMode === value
+                                ? "bg-black text-white dark:bg-white dark:text-black"
+                                : "hover:bg-stone-100 dark:hover:bg-stone-900",
+                            ].join(" ")}
+                            onClick={() => setRunMode(value)}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <textarea
                       id="prompt-textarea"
                       tabIndex={0}

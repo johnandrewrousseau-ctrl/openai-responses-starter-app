@@ -9,12 +9,22 @@ import { Item, processMessages } from "@/lib/assistant";
 
 
 export default function Assistant() {
-  const { chatMessages, addConversationItem, addChatMessage, setAssistantLoading } =
+  const { chatMessages, addConversationItem, addChatMessage, setAssistantLoading, runMode } =
     useConversationStore();
 
   const handleSendMessage = async (message: string) => {
     const text = (message || "").trim();
     if (!text) return;
+
+    const header =
+      runMode === "canon"
+        ? "CANON_QUERY_RUNNER"
+        : runMode === "threads"
+          ? "THREAD_QUERY_RUNNER"
+          : runMode === "gold"
+            ? "GOLD_HUNT_RUNNER"
+            : "";
+    const wireContent = header ? `${header}\nQuestion: ${text}` : text;
 
     const userItem: Item = {
       type: "message",
@@ -24,7 +34,7 @@ export default function Assistant() {
 
     const userMessage: any = {
       role: "user",
-      content: text,
+      content: wireContent,
     };
 
     try {
@@ -62,4 +72,3 @@ export default function Assistant() {
     </div>
   );
 }
-

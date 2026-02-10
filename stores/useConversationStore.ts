@@ -3,6 +3,8 @@ import { Item } from "@/lib/assistant";
 import { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { INITIAL_MESSAGE } from "@/config/constants";
 
+export type RunMode = "normal" | "canon" | "threads" | "gold";
+
 interface ConversationState {
   // Items displayed in the chat
   chatMessages: Item[];
@@ -10,12 +12,15 @@ interface ConversationState {
   conversationItems: any[];
   // Whether we are waiting for the assistant response
   isAssistantLoading: boolean;
+  // Runner mode for routing (UI only)
+  runMode: RunMode;
 
   setChatMessages: (items: Item[]) => void;
   setConversationItems: (messages: any[]) => void;
   addChatMessage: (item: Item) => void;
   addConversationItem: (message: ChatCompletionMessageParam) => void;
   setAssistantLoading: (loading: boolean) => void;
+  setRunMode: (mode: RunMode) => void;
   rawSet: (state: any) => void;
   resetConversation: () => void;
 }
@@ -30,6 +35,7 @@ const useConversationStore = create<ConversationState>((set) => ({
   ],
   conversationItems: [],
   isAssistantLoading: false,
+  runMode: "normal",
   setChatMessages: (items) => set({ chatMessages: items }),
   setConversationItems: (messages) => set({ conversationItems: messages }),
   addChatMessage: (item) =>
@@ -39,6 +45,7 @@ const useConversationStore = create<ConversationState>((set) => ({
       conversationItems: [...state.conversationItems, message],
     })),
   setAssistantLoading: (loading) => set({ isAssistantLoading: loading }),
+  setRunMode: (mode) => set({ runMode: mode }),
   rawSet: set,
   resetConversation: () =>
     set(() => ({

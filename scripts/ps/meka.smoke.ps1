@@ -204,6 +204,19 @@ if ($threadsId) {
 }
 Assert-True ($statusOk) "vs_audit_has_status_counts" "Expected status_counts and numeric files_total."
 
+$indexOk = $true
+if ($canonId) {
+  $indexOk = $indexOk -and ($auditJson.canon.indexed_sample_checked -is [int] -or $auditJson.canon.indexed_sample_checked -is [double])
+  $indexOk = $indexOk -and ($auditJson.canon.indexed_sample_ok -is [int] -or $auditJson.canon.indexed_sample_ok -is [double])
+  $indexOk = $indexOk -and ($auditJson.canon.indexed_sample_failed -is [int] -or $auditJson.canon.indexed_sample_failed -is [double])
+}
+if ($threadsId) {
+  $indexOk = $indexOk -and ($auditJson.threads.indexed_sample_checked -is [int] -or $auditJson.threads.indexed_sample_checked -is [double])
+  $indexOk = $indexOk -and ($auditJson.threads.indexed_sample_ok -is [int] -or $auditJson.threads.indexed_sample_ok -is [double])
+  $indexOk = $indexOk -and ($auditJson.threads.indexed_sample_failed -is [int] -or $auditJson.threads.indexed_sample_failed -is [double])
+}
+Assert-True ($indexOk) "vs_audit_index_sample_schema" "Expected indexed_sample_* counters."
+
 # 1.6) toolsState must accept dev_bypass_active when present
 $devBypassBody = Get-Content (Join-Path $fixtures "tools_state_dev_bypass.json") -Raw
 $resp1c = Invoke-TurnResponse -BaseUrl $Base -BodyJson $devBypassBody

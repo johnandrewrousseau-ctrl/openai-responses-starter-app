@@ -118,6 +118,43 @@ async function auditStore(
   const sortedFileIds = [...fileIds].filter((x) => x).sort();
   const snapshotSha256 = createHash("sha256").update(sortedFileIds.join("\n")).digest("hex");
 
+  // Per-file indexability sample (recent completed files)
+  const completedFiles = files
+    .filter((f) => f.status === "completed" && f.file_id)
+    .sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0))
+    .slice(0, 10);
+  let indexedSampleChecked = 0;
+  let indexedSampleOk = 0;
+  let indexedSampleFailed = 0;
+  const indexedSampleFailures: Array<{ file_id: string; error: string }> = [];
+  const indexedSample: Array<{ file_id: string; ok: boolean }> = [];
+
+  for (const f of completedFiles) {
+    if (!f.file_id) continue;
+    indexedSampleChecked++;
+    try {
+      const probe = await openai.vectorStores.search(vectorStoreId, {
+        query: "drift",
+        max_num_results: 3,
+        filters: { key: "file_id", operator: "eq", value: f.file_id },
+      });
+      const probeArr = Array.isArray((probe as any)?.data) ? (probe as any).data : [];
+      const ok = probeArr.length > 0;
+      indexedSample.push({ file_id: f.file_id, ok });
+      if (ok) indexedSampleOk++;
+      else indexedSampleFailed++;
+    } catch (e: any) {
+      indexedSampleFailed++;
+      if (indexedSampleFailures.length < 5) {
+        indexedSampleFailures.push({
+          file_id: f.file_id,
+          error: safeTruncate(String(e?.message ?? e ?? "unknown_error"), 200),
+        });
+      }
+      indexedSample.push({ file_id: f.file_id, ok: false });
+    }
+  }
+
   const probeRuns = [];
   for (const q of queries) {
     const searchRes = await openai.vectorStores.search(vectorStoreId, {
@@ -143,6 +180,11 @@ async function auditStore(
     truncated,
     file_ids: sortedFileIds,
     snapshot_sha256: snapshotSha256,
+    indexed_sample_checked: indexedSampleChecked,
+    indexed_sample_ok: indexedSampleOk,
+    indexed_sample_failed: indexedSampleFailed,
+    indexed_sample_failures: indexedSampleFailures,
+    indexed_sample: indexedSample,
     status_counts: statusCounts,
     failed_files_sample: failedFilesSample,
     files,

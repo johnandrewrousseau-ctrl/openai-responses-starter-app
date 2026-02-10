@@ -3,7 +3,7 @@ export const runtime = "nodejs";
 import OpenAI from "openai";
 
 /// ADMIN_GATE_V1
-import { timingSafeEqual } from "crypto";
+import { createHash, timingSafeEqual } from "crypto";
 
 function json(body: any, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
@@ -43,13 +43,63 @@ function safeTruncate(s: string, max = 200) {
   return s.length > max ? s.slice(0, max) + "…" : s;
 }
 
-async function auditStore(kind: "canon" | "threads", vectorStoreId: string, query: string, limit: number) {
-  const filesRes = await openai.vectorStores.files.list(vectorStoreId);
-  const filesArr = Array.isArray((filesRes as any)?.data) ? (filesRes as any).data : [];
-  const files = filesArr.map((f: any) => ({
-    file_id: f?.id ?? null,
-    filename: f?.filename ?? f?.name ?? null,
-  }));
+async function auditStore(
+  kind: "canon" | "threads",
+  vectorStoreId: string,
+  query: string,
+  limit: number,
+  maxFiles: number,
+  includeFilenames: boolean
+) {
+  const files: Array<{ file_id: string | null; filename: string | null }> = [];
+  const fileIds: string[] = [];
+  let pagesFetched = 0;
+  let hasMoreFinal = false;
+  let after: string | undefined = undefined;
+  const pageLimitDefault = 100;
+
+  while (files.length < maxFiles) {
+    const pageLimit = Math.min(pageLimitDefault, Math.max(1, maxFiles - files.length));
+    const filesRes = await openai.vectorStores.files.list(vectorStoreId, {
+      limit: pageLimit,
+      ...(after ? { after } : {}),
+    });
+    pagesFetched++;
+
+    const filesArr = Array.isArray((filesRes as any)?.data) ? (filesRes as any).data : [];
+    for (const f of filesArr) {
+      const fileId = f?.id ?? null;
+      const filename = f?.filename ?? f?.name ?? null;
+      files.push({ file_id: fileId, filename });
+      if (fileId) fileIds.push(String(fileId));
+    }
+
+    hasMoreFinal = Boolean((filesRes as any)?.has_more);
+    if (!hasMoreFinal || filesArr.length === 0) break;
+
+    const last = filesArr[filesArr.length - 1];
+    after = last?.id ? String(last.id) : undefined;
+    if (!after) break;
+  }
+
+  if (includeFilenames) {
+    const cap = Math.min(200, files.length);
+    for (let i = 0; i < cap; i++) {
+      const f = files[i];
+      if (!f || !f.file_id) continue;
+      if (f.filename && f.filename.trim()) continue;
+      try {
+        const fileObj = await openai.files.retrieve(f.file_id);
+        const name = (fileObj as any)?.filename ?? (fileObj as any)?.name ?? null;
+        if (name) files[i] = { ...f, filename: String(name) };
+      } catch {
+        // best-effort only
+      }
+    }
+  }
+
+  const sortedFileIds = [...fileIds].filter((x) => x).sort();
+  const snapshotSha256 = createHash("sha256").update(sortedFileIds.join("\n")).digest("hex");
 
   const searchRes = await openai.vectorStores.search(vectorStoreId, {
     query,
@@ -65,7 +115,11 @@ async function auditStore(kind: "canon" | "threads", vectorStoreId: string, quer
   return {
     kind,
     vector_store_id: vectorStoreId,
-    files_total: filesArr.length,
+    files_total: files.length,
+    pages_fetched: pagesFetched,
+    has_more_final: hasMoreFinal,
+    file_ids: sortedFileIds,
+    snapshot_sha256: snapshotSha256,
     files,
     search_probe: {
       query,
@@ -83,6 +137,10 @@ export async function GET(request: Request) {
   const q = (searchParams.get("q") || "drift countermeasure").trim();
   const limitRaw = Number(searchParams.get("limit") || "5");
   const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.floor(limitRaw) : 5;
+  const maxFilesRaw = Number(searchParams.get("max_files") || "5000");
+  const maxFiles = Number.isFinite(maxFilesRaw) && maxFilesRaw > 0 ? Math.floor(maxFilesRaw) : 5000;
+  const includeFilenames =
+    String(searchParams.get("include_filenames") || "0").trim() === "1";
 
   const wantCanon = storeRaw === "canon" || storeRaw === "all";
   const wantThreads = storeRaw === "threads" || storeRaw === "all";
@@ -104,9 +162,19 @@ export async function GET(request: Request) {
   }
 
   try {
-    const out: any = { ok: true, query: q, limit };
-    if (wantCanon && canonId) out.canon = await auditStore("canon", canonId, q, limit);
-    if (wantThreads && threadsId) out.threads = await auditStore("threads", threadsId, q, limit);
+    const out: any = {
+      ok: true,
+      query: q,
+      limit,
+      max_files: maxFiles,
+      include_filenames: includeFilenames,
+    };
+    if (wantCanon && canonId) {
+      out.canon = await auditStore("canon", canonId, q, limit, maxFiles, includeFilenames);
+    }
+    if (wantThreads && threadsId) {
+      out.threads = await auditStore("threads", threadsId, q, limit, maxFiles, includeFilenames);
+    }
     return json(out, 200);
   } catch (err: any) {
     return json(

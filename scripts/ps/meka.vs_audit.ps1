@@ -29,7 +29,10 @@ function Print-StoreSummary {
 
   $id = $Obj.vector_store_id
   $total = $Obj.files_total
-  Write-Host "$Name: $id (files_total=$total)"
+  $pages = $Obj.pages_fetched
+  $snap = $Obj.snapshot_sha256
+  Write-Host "$Name: $id (files_total=$total, pages_fetched=$pages)"
+  if ($snap) { Write-Host ("snapshot_sha256: " + $snap) }
 
   $hits = @()
   if ($Obj.search_probe -and $Obj.search_probe.results) {

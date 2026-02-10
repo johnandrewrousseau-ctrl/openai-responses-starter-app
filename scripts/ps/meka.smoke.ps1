@@ -168,6 +168,24 @@ if ($threadsId) {
 }
 Assert-True ($schemaOk) "vs_audit_has_schema" "Expected canon/threads keys with numeric files_total when env vars exist."
 
+$paginateOk = $true
+if ($canonId) {
+  $paginateOk = $paginateOk -and ($auditJson.canon.pages_fetched -ge 1) -and ($auditJson.canon.has_more_final -eq $false)
+}
+if ($threadsId) {
+  $paginateOk = $paginateOk -and ($auditJson.threads.pages_fetched -ge 1) -and ($auditJson.threads.has_more_final -eq $false)
+}
+Assert-True ($paginateOk) "vs_audit_paginates" "Expected pages_fetched >= 1 and has_more_final = false."
+
+$snapshotOk = $true
+if ($canonId) {
+  $snapshotOk = $snapshotOk -and ($auditJson.canon.snapshot_sha256 -and ($auditJson.canon.snapshot_sha256.Length -ge 32))
+}
+if ($threadsId) {
+  $snapshotOk = $snapshotOk -and ($auditJson.threads.snapshot_sha256 -and ($auditJson.threads.snapshot_sha256.Length -ge 32))
+}
+Assert-True ($snapshotOk) "vs_audit_has_snapshot" "Expected snapshot_sha256 to be present."
+
 # 1.6) toolsState must accept dev_bypass_active when present
 $devBypassBody = Get-Content (Join-Path $fixtures "tools_state_dev_bypass.json") -Raw
 $resp1c = Invoke-TurnResponse -BaseUrl $Base -BodyJson $devBypassBody

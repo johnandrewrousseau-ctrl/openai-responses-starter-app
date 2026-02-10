@@ -115,6 +115,17 @@ Assert-True ($canonHdr -and $canonHdr.Trim().Length -gt 0) "canon_mode_forces_ca
 $canonHasFileSearch = SseHasFileSearchEvent $resp1canon.Content
 Assert-True ($canonHasFileSearch) "canon_mode_triggers_file_search" "Expected SSE stream to include file_search."
 
+# 1.3) Thread mode forces file_search call/event
+$threadBody = Get-Content (Join-Path $fixtures "thread_mode.json") -Raw
+$resp1thread = Invoke-TurnResponse -BaseUrl $Base -BodyJson $threadBody
+Assert-True ($resp1thread.StatusCode -eq 200) "thread_mode_http_200" "Expected 200, got $($resp1thread.StatusCode)"
+
+$threadHdr = $resp1thread.Headers["x-meka-threads-vs"]
+Assert-True ($threadHdr -and $threadHdr.Trim().Length -gt 0) "thread_mode_forces_threads_vector_store" "Expected x-meka-threads-vs header to be non-empty. Got: [$threadHdr]"
+
+$threadHasFileSearch = SseHasFileSearchEvent $resp1thread.Content
+Assert-True ($threadHasFileSearch) "thread_mode_triggers_file_search" "Expected SSE stream to include file_search."
+
 # 1.5) toolsState must reject unknown keys
 $extraBody = Get-Content (Join-Path $fixtures "tools_state_extra.json") -Raw
 $resp1b = Invoke-TurnResponse -BaseUrl $Base -BodyJson $extraBody

@@ -1,0 +1,16 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "THREAD_QUERY_RUNNER\nQuestion: Find the best \"drift countermeasure\" mechanisms from my threads."
+    }
+  ],
+  "toolsState": {
+    "fileSearchEnabled": true,
+    "webSearchEnabled": false,
+    "functionsEnabled": false,
+    "googleIntegrationEnabled": false,
+    "mcpEnabled": false,
+    "codeInterpreterEnabled": false
+  }
+}

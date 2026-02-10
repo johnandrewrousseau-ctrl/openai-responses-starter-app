@@ -1059,6 +1059,14 @@ function isCanonModeExplicit(lastUserText: string): boolean {
   );
 }
 
+function isThreadModeExplicit(lastUserText: string): boolean {
+  if (!lastUserText) return false;
+  return (
+    lastUserText.includes("THREAD_QUERY_RUNNER") ||
+    lastUserText.includes("Target: THREADS ONLY")
+  );
+}
+
 /**
  * Sanitize tool array so we never send invalid vector_store_ids.
  * - For file_search: remove null/empty IDs
@@ -1536,11 +1544,20 @@ export async function POST(request: Request) {
     const lastUserText = [...normalized].reverse().find((m) => m.role === "user")?.content || "";
 
     const canonModeActive = isCanonModeExplicit(lastUserText);
+    const threadModeActive = isThreadModeExplicit(lastUserText);
     if (canonModeActive && !fileSearchEnabled) {
       return jsonError(
         400,
         "canon_mode_requires_file_search",
         "Canon mode requires toolsState.fileSearchEnabled=true.",
+        { hint: "Set toolsState.fileSearchEnabled=true and retry." }
+      );
+    }
+    if (threadModeActive && !fileSearchEnabled) {
+      return jsonError(
+        400,
+        "thread_mode_requires_file_search",
+        "Thread mode requires toolsState.fileSearchEnabled=true.",
         { hint: "Set toolsState.fileSearchEnabled=true and retry." }
       );
     }
@@ -1553,6 +1570,17 @@ export async function POST(request: Request) {
         "canon_mode_requires_canon_vector_store",
         "Canon mode requires MEKA_VECTOR_STORE_ID_CANON to be set.",
         { hint: "Set MEKA_VECTOR_STORE_ID_CANON in your .env.local and retry." }
+      );
+    }
+    const threadVectorStoreIds = threadModeActive
+      ? sanitizeVectorStoreIds([process.env.MEKA_VECTOR_STORE_ID_THREADS])
+      : [];
+    if (threadModeActive && threadVectorStoreIds.length === 0) {
+      return jsonError(
+        400,
+        "thread_mode_requires_threads_vector_store",
+        "Thread mode requires MEKA_VECTOR_STORE_ID_THREADS to be set.",
+        { hint: "Set MEKA_VECTOR_STORE_ID_THREADS in your .env.local and retry." }
       );
     }
 
@@ -1647,6 +1675,14 @@ export async function POST(request: Request) {
         return t;
       });
     }
+    if (threadModeActive) {
+      tools = tools.map((t: any) => {
+        if (t && typeof t === "object" && t.type === "file_search") {
+          return { ...t, vector_store_ids: threadVectorStoreIds };
+        }
+        return t;
+      });
+    }
 // If we lost all file_search tools due to bad IDs, fail fast with a clear message.
     const hasFileSearch = tools.some((t) => t && typeof t === "object" && (t as any).type === "file_search");
     if (!hasFileSearch) {
@@ -1692,6 +1728,7 @@ export async function POST(request: Request) {
 
     const origin = new URL(request.url).origin;
     const canonToolChoice = canonModeActive ? ({ type: "file_search" } as const) : null;
+    const threadToolChoice = threadModeActive ? ({ type: "file_search" } as const) : null;
 
     // If any local function tools are present, run the documented tool loop non-streaming,
     // then we will emit the result as SSE (single delta + done).
@@ -1699,7 +1736,7 @@ export async function POST(request: Request) {
       (t: any) => t && typeof t === "object" && t.type === "function" && typeof t.name === "string"
     );
 
-    if (hasLocalFunctionTools && !canonModeActive) {
+    if (hasLocalFunctionTools && !canonModeActive && !threadModeActive) {
       const ran = await runWithLocalFunctionTools({
         origin,
         model: MODEL,
@@ -1741,6 +1778,7 @@ assistantText = finalText;
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
           ...(canonModeActive ? { "x-meka-canon-vs": canonVectorStoreIds.join(",") } : {}),
+          ...(threadModeActive ? { "x-meka-threads-vs": threadVectorStoreIds.join(",") } : {}),
         },
       });
     }
@@ -1756,6 +1794,7 @@ assistantText = finalText;
       stream: true,
       parallel_tool_calls: false,
       ...(canonToolChoice ? { tool_choice: canonToolChoice } : {}),
+      ...(threadToolChoice ? { tool_choice: threadToolChoice } : {}),
     });
 
     // Streaming writeback suppression state (must exist, or takeVisibleFromDelta will crash)
@@ -2015,6 +2054,7 @@ assistantText = finalText;
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         ...(canonModeActive ? { "x-meka-canon-vs": canonVectorStoreIds.join(",") } : {}),
+        ...(threadModeActive ? { "x-meka-threads-vs": threadVectorStoreIds.join(",") } : {}),
       },
     });
   } catch (error) {
@@ -2027,8 +2067,3 @@ assistantText = finalText;
     );
   }
 }
-
-
-
-
-

@@ -186,6 +186,24 @@ if ($threadsId) {
 }
 Assert-True ($snapshotOk) "vs_audit_has_snapshot" "Expected snapshot_sha256 to be present."
 
+$truncOk = $true
+if ($canonId) {
+  $truncOk = $truncOk -and ($auditJson.canon.truncated -eq $false)
+}
+if ($threadsId) {
+  $truncOk = $truncOk -and ($auditJson.threads.truncated -eq $false)
+}
+Assert-True ($truncOk) "vs_audit_not_truncated" "Expected truncated = false."
+
+$statusOk = $true
+if ($canonId) {
+  $statusOk = $statusOk -and $auditJson.canon.status_counts -and ($auditJson.canon.files_total -is [int] -or $auditJson.canon.files_total -is [double])
+}
+if ($threadsId) {
+  $statusOk = $statusOk -and $auditJson.threads.status_counts -and ($auditJson.threads.files_total -is [int] -or $auditJson.threads.files_total -is [double])
+}
+Assert-True ($statusOk) "vs_audit_has_status_counts" "Expected status_counts and numeric files_total."
+
 # 1.6) toolsState must accept dev_bypass_active when present
 $devBypassBody = Get-Content (Join-Path $fixtures "tools_state_dev_bypass.json") -Raw
 $resp1c = Invoke-TurnResponse -BaseUrl $Base -BodyJson $devBypassBody

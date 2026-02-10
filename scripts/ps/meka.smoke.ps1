@@ -137,6 +137,14 @@ Assert-True ($goldHdr -and $goldHdr.Trim().Length -gt 0) "gold_hunt_mode_forces_
 $goldHasFileSearch = SseHasFileSearchEvent $resp1gold.Content
 Assert-True ($goldHasFileSearch) "gold_hunt_mode_triggers_file_search" "Expected SSE stream to include file_search."
 
+# 1.4.5) Mode conflict must 400
+$conflictBody = Get-Content (Join-Path $fixtures "mode_conflict.json") -Raw
+$resp1conflict = Invoke-TurnResponse -BaseUrl $Base -BodyJson $conflictBody
+Assert-True ($resp1conflict.StatusCode -eq 400) "mode_conflict_400" "Expected 400, got $($resp1conflict.StatusCode)"
+
+$conflictHasCode = ($resp1conflict.Content -match "mode_conflict")
+Assert-True ($conflictHasCode) "mode_conflict_code_present" "Expected response to include mode_conflict."
+
 # 1.5) toolsState must reject unknown keys
 $extraBody = Get-Content (Join-Path $fixtures "tools_state_extra.json") -Raw
 $resp1b = Invoke-TurnResponse -BaseUrl $Base -BodyJson $extraBody

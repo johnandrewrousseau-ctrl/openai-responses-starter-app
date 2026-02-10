@@ -1051,6 +1051,14 @@ function sanitizeVectorStoreIds(ids: any): string[] {
     .filter((x) => x.length > 0);
 }
 
+function isCanonModeExplicit(lastUserText: string): boolean {
+  if (!lastUserText) return false;
+  return (
+    lastUserText.includes("CANON_QUERY_RUNNER") ||
+    lastUserText.includes("Target: CANON ONLY")
+  );
+}
+
 /**
  * Sanitize tool array so we never send invalid vector_store_ids.
  * - For file_search: remove null/empty IDs
@@ -1317,6 +1325,7 @@ export async function POST(request: Request) {
     const toolsStateObj =
       toolsState !== undefined && toolsState !== null && typeof toolsState === "object" ? (toolsState as any) : {};
 
+    const fileSearchEnabled = Boolean(toolsStateObj?.fileSearchEnabled);
     const wantsFunctions = Boolean(toolsStateObj?.functionsEnabled);
 
     // Only allow function tools when the request is authorized (admin token) OR dev loopback bypass is active.
@@ -1526,6 +1535,16 @@ export async function POST(request: Request) {
     const normalized = normalizeMessages(messages);
     const lastUserText = [...normalized].reverse().find((m) => m.role === "user")?.content || "";
 
+    const canonModeActive = isCanonModeExplicit(lastUserText);
+    if (canonModeActive && !fileSearchEnabled) {
+      return jsonError(
+        400,
+        "canon_mode_requires_file_search",
+        "Canon mode requires toolsState.fileSearchEnabled=true.",
+        { hint: "Set toolsState.fileSearchEnabled=true and retry." }
+      );
+    }
+
     // ---------- Phase C1: truth-source policy ----------
     const truthPolicy = resolveTruthSourcePolicy(lastUserText);
 
@@ -1653,6 +1672,7 @@ export async function POST(request: Request) {
     ];
 
     const origin = new URL(request.url).origin;
+    const canonToolChoice = canonModeActive ? ({ type: "file_search" } as const) : null;
 
     // If any local function tools are present, run the documented tool loop non-streaming,
     // then we will emit the result as SSE (single delta + done).
@@ -1660,7 +1680,7 @@ export async function POST(request: Request) {
       (t: any) => t && typeof t === "object" && t.type === "function" && typeof t.name === "string"
     );
 
-    if (hasLocalFunctionTools) {
+    if (hasLocalFunctionTools && !canonModeActive) {
       const ran = await runWithLocalFunctionTools({
         origin,
         model: MODEL,
@@ -1715,6 +1735,7 @@ assistantText = finalText;
       max_output_tokens: MEKA_BUDGETS.maxOutputTokens,
       stream: true,
       parallel_tool_calls: false,
+      ...(canonToolChoice ? { tool_choice: canonToolChoice } : {}),
     });
 
     // Streaming writeback suppression state (must exist, or takeVisibleFromDelta will crash)
@@ -1985,11 +2006,6 @@ assistantText = finalText;
     );
   }
 }
-
-
-
-
-
 
 
 

@@ -1,0 +1,16 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "CANON_QUERY_RUNNER\nQuestion: What does the Canon say about governance?"
+    }
+  ],
+  "toolsState": {
+    "fileSearchEnabled": true,
+    "webSearchEnabled": false,
+    "functionsEnabled": false,
+    "googleIntegrationEnabled": false,
+    "mcpEnabled": false,
+    "codeInterpreterEnabled": false
+  }
+}

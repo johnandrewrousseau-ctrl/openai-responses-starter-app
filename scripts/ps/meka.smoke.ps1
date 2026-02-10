@@ -60,6 +60,18 @@ function Extract-AssistantTextFromSse {
   return ($deltas -join "")
 }
 
+function SseHasFileSearchEvent {
+  param([string]$SseContent)
+
+  foreach ($rawLine in ($SseContent -split "`n")) {
+    $line = $rawLine.Trim()
+    if (-not $line.StartsWith("data:")) { continue }
+    if ($line -match "file_search") { return $true }
+  }
+
+  return $false
+}
+
 function Invoke-TurnResponse {
   param(
     [string]$BaseUrl,
@@ -91,6 +103,14 @@ Assert-True ($resp1.StatusCode -eq 200) "baseline_http_200" "Expected 200, got $
 $txt1 = Extract-AssistantTextFromSse $resp1.Content
 $txt1Trim = ($txt1 ?? "").Trim()
 Assert-True ($txt1Trim -like "*BASELINE_OK*") "baseline_turn_works" "Expected BASELINE_OK. Got: [$txt1Trim]"
+
+# 1.2) Canon mode forces file_search call/event
+$canonBody = Get-Content (Join-Path $fixtures "canon_mode.json") -Raw
+$resp1canon = Invoke-TurnResponse -BaseUrl $Base -BodyJson $canonBody
+Assert-True ($resp1canon.StatusCode -eq 200) "canon_mode_http_200" "Expected 200, got $($resp1canon.StatusCode)"
+
+$canonHasFileSearch = SseHasFileSearchEvent $resp1canon.Content
+Assert-True ($canonHasFileSearch) "canon_mode_triggers_file_search" "Expected SSE stream to include file_search."
 
 # 1.5) toolsState must reject unknown keys
 $extraBody = Get-Content (Join-Path $fixtures "tools_state_extra.json") -Raw
@@ -133,5 +153,4 @@ if (-not $token) {
 }
 
 Write-Host "OK: MEKA smoke checks complete."
-
 

@@ -31,7 +31,7 @@ function Print-StoreSummary {
   $total = $Obj.files_total
   $pages = $Obj.pages_fetched
   $snap = $Obj.snapshot_sha256
-  Write-Host "$Name: $id (files_total=$total, pages_fetched=$pages)"
+  Write-Host ("{0}: {1} (files_total={2}, pages_fetched={3})" -f $Name, $id, $total, $pages)
   if ($snap) { Write-Host ("snapshot_sha256: " + $snap) }
 
   $hits = @()

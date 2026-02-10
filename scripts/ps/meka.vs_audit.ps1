@@ -13,11 +13,14 @@ function Read-EnvValue {
   param([string]$EnvPath, [string]$Key)
   if (-not (Test-Path $EnvPath)) { return "" }
 
-  $m = Select-String -Path $EnvPath -Pattern ("^\\s*" + [regex]::Escape($Key) + "\\s*=\\s*(.+)\\s*$") -AllMatches -ErrorAction SilentlyContinue |
-       Select-Object -First 1
-  if (-not $m) { return "" }
+  $raw = Get-Content -Path $EnvPath -Raw
+  if (-not $raw) { return "" }
 
-  $val = $m.Matches[0].Groups[1].Value.Trim()
+  $pattern = "^\s*(export\s+)?"+ [regex]::Escape($Key) + "\s*=\s*(.+)\s*$"
+  $m = [regex]::Match($raw, $pattern, [System.Text.RegularExpressions.RegexOptions]::Multiline)
+  if (-not $m.Success) { return "" }
+
+  $val = $m.Groups[2].Value.Trim()
   if ($val.StartsWith('"') -and $val.EndsWith('"') -and $val.Length -ge 2) { $val = $val.Substring(1, $val.Length-2) }
   if ($val.StartsWith("'") -and $val.EndsWith("'") -and $val.Length -ge 2) { $val = $val.Substring(1, $val.Length-2) }
   return $val
@@ -49,9 +52,12 @@ function Print-StoreSummary {
 }
 
 $Root = (Resolve-Path (Join-Path $PSScriptRoot "..\\..")).Path
-$token = Read-EnvValue (Join-Path $Root ".env.local") "MEKA_ADMIN_TOKEN"
+$token = $env:MEKA_ADMIN_TOKEN
 if (-not $token) {
-  throw "MEKA_ADMIN_TOKEN missing in .env.local"
+  $token = Read-EnvValue (Join-Path $Root ".env.local") "MEKA_ADMIN_TOKEN"
+}
+if (-not $token) {
+  throw "MEKA_ADMIN_TOKEN missing (set env var or .env.local)"
 }
 
 $headers = @{ Authorization = ("Bearer " + $token) }

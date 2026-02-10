@@ -64,3 +64,14 @@ backup/
 # MEKA: local scratch + logs
 _scratch_*
 logs/
+
+# ---- Codex/workbench + local ops ----
+.codex/
+MEKA_DEEP_DIVE_CLEAN.txt
+.env.local
+.env.local.*
+.env.*.bak.*
+node_modules/
+.next/
+dist/
+*.log

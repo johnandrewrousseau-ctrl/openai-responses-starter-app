@@ -150,6 +150,24 @@ $extraBody = Get-Content (Join-Path $fixtures "tools_state_extra.json") -Raw
 $resp1b = Invoke-TurnResponse -BaseUrl $Base -BodyJson $extraBody
 Assert-True ($resp1b.StatusCode -eq 400) "tools_state_rejects_extra" "Expected 400 for unknown toolsState keys. Got $($resp1b.StatusCode)"
 
+# 1.7) Vector store audit must succeed
+$auditToken = Read-EnvValue (Join-Path $Root ".env.local") "MEKA_ADMIN_TOKEN"
+$auditHeaders = @{ Authorization = ("Bearer " + $auditToken) }
+$respAudit = Invoke-WebRequest "$Base/api/vs_audit?store=all" -Method Get -Headers $auditHeaders -SkipHttpErrorCheck
+Assert-True ($respAudit.StatusCode -eq 200) "vs_audit_http_200" "Expected 200 from /api/vs_audit. Got $($respAudit.StatusCode)"
+
+$auditJson = $respAudit.Content | ConvertFrom-Json
+$canonId = Read-EnvValue (Join-Path $Root ".env.local") "MEKA_VECTOR_STORE_ID_CANON"
+$threadsId = Read-EnvValue (Join-Path $Root ".env.local") "MEKA_VECTOR_STORE_ID_THREADS"
+$schemaOk = $true
+if ($canonId) {
+  $schemaOk = $schemaOk -and $auditJson.canon -and ($auditJson.canon.files_total -is [int] -or $auditJson.canon.files_total -is [double])
+}
+if ($threadsId) {
+  $schemaOk = $schemaOk -and $auditJson.threads -and ($auditJson.threads.files_total -is [int] -or $auditJson.threads.files_total -is [double])
+}
+Assert-True ($schemaOk) "vs_audit_has_schema" "Expected canon/threads keys with numeric files_total when env vars exist."
+
 # 1.6) toolsState must accept dev_bypass_active when present
 $devBypassBody = Get-Content (Join-Path $fixtures "tools_state_dev_bypass.json") -Raw
 $resp1c = Invoke-TurnResponse -BaseUrl $Base -BodyJson $devBypassBody

@@ -76,3 +76,4 @@ node_modules/
 dist/
 *.log
 meka/out/
+state/vs_ingest_state.json

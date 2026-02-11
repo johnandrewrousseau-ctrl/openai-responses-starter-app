@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][int]$Port)
+param([int]$Port = 3000)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"

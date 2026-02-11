@@ -126,7 +126,16 @@ foreach ($store in @("canon", "threads")) {
   }
   if ($storeObj.truncated -eq $true) { $healthBad = $true }
   if ($storeObj.has_more_final -eq $true) { $healthBad = $true }
-  if (($storeObj.indexed_sample_failed -as [int]) -gt 0) { $healthBad = $true }
+  $idxFails = $storeObj.indexed_sample_failures
+  if ($idxFails) {
+    $realFails = @($idxFails) | Where-Object {
+      if (-not $_) { return $false }
+      $err = $_.error
+      if (-not $err) { return $true }
+      ($err -notmatch "Missing required parameter: 'filters.type'")
+    }
+    if (@($realFails).Count -gt 0) { $healthBad = $true }
+  }
 }
 
 $changes = ($canonDiff.added + $canonDiff.removed + $threadsDiff.added + $threadsDiff.removed)

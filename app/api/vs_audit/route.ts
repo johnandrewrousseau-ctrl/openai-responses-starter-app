@@ -99,8 +99,12 @@ async function auditStore(
   }
   if (files.length >= maxFiles && hasMoreFinal) truncated = true;
 
+  let filenamesResolved = 0;
+  let filenamesMissing = 0;
+  let filenamesResolutionCapped = false;
   if (includeFilenames) {
-    const cap = Math.min(200, files.length);
+    const cap = Math.min(300, files.length);
+    if (files.length > cap) filenamesResolutionCapped = true;
     for (let i = 0; i < cap; i++) {
       const f = files[i];
       if (!f || !f.file_id) continue;
@@ -113,6 +117,10 @@ async function auditStore(
         // best-effort only
       }
     }
+  }
+  for (const f of files) {
+    if (f?.filename && String(f.filename).trim()) filenamesResolved++;
+    else filenamesMissing++;
   }
 
   const sortedFileIds = [...fileIds].filter((x) => x).sort();
@@ -185,6 +193,9 @@ async function auditStore(
     indexed_sample_failed: indexedSampleFailed,
     indexed_sample_failures: indexedSampleFailures,
     indexed_sample: indexedSample,
+    filenames_resolved: filenamesResolved,
+    filenames_missing: filenamesMissing,
+    filenames_resolution_capped: filenamesResolutionCapped,
     status_counts: statusCounts,
     failed_files_sample: failedFilesSample,
     files,
@@ -206,7 +217,8 @@ export async function GET(request: Request) {
   const maxFilesRaw = Number(searchParams.get("max_files") || "5000");
   const maxFiles = Number.isFinite(maxFilesRaw) && maxFilesRaw > 0 ? Math.floor(maxFilesRaw) : 5000;
   const includeFilenames =
-    String(searchParams.get("include_filenames") || "0").trim() === "1";
+    String(searchParams.get("include_filenames") || "0").trim() === "1" ||
+    String(searchParams.get("names") || "0").trim() === "1";
   const queries = [q, q2, q3].filter((x) => x);
 
   const wantCanon = storeRaw === "canon" || storeRaw === "all";

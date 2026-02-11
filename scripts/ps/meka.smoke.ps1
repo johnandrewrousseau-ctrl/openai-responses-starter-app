@@ -218,6 +218,18 @@ if ($threadsId) {
 }
 Assert-True ($indexOk) "vs_audit_index_sample_schema" "Expected indexed_sample_* counters."
 
+# 1.5.1) vector store inventory (public, no admin gate)
+$respInv = Invoke-WebRequest "$Base/api/vs_inventory?store=threads&include_filenames=1" -Method Get -SkipHttpErrorCheck -TimeoutSec 30
+Assert-True ($respInv.StatusCode -eq 200) "vs_inventory_http_200" "Expected 200 from /api/vs_inventory. Got $($respInv.StatusCode)"
+$invJson = $respInv.Content | ConvertFrom-Json
+$invOk = $true
+$invOk = $invOk -and ($invJson.ok -eq $true) -and $invJson.threads
+$invOk = $invOk -and ($invJson.threads.files_total -is [int] -or $invJson.threads.files_total -is [long] -or $invJson.threads.files_total -is [double])
+$invFilesCount = @($invJson.threads.files).Count
+$invOk = $invOk -and ($invFilesCount -eq [int]$invJson.threads.files_total)
+$invOk = $invOk -and ($invJson.threads.has_more_final -eq $false)
+Assert-True ($invOk) "vs_inventory_threads_complete" "Expected files_total numeric, files length to match, and has_more_final=false."
+
 # 1.6) toolsState must accept dev_bypass_active when present
 $devBypassBody = Get-Content (Join-Path $fixtures "tools_state_dev_bypass.json") -Raw
 $resp1c = Invoke-TurnResponse -BaseUrl $Base -BodyJson $devBypassBody

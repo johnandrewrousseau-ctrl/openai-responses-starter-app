@@ -85,6 +85,14 @@ async function getJson(path: string): Promise<JsonValue> {
   return fetchJson(url, { method: "GET", headers, cache: "no-store" as any });
 }
 
+async function getJsonPublic(path: string): Promise<JsonValue> {
+  const url = makeUrl(path);
+  const headers: Record<string, string> = {
+    "Cache-Control": "no-store",
+  };
+  return fetchJson(url, { method: "GET", headers, cache: "no-store" as any });
+}
+
 async function postJson(path: string, bodyObj: any): Promise<JsonValue> {
   const url = makeUrl(path);
   const headers: Record<string, string> = {
@@ -194,6 +202,19 @@ export const fs_propose_change = async (args: any) => {
   };
 };
 
+/** vs_inventory: GET /api/vs_inventory?store=...&include_filenames=1 */
+export const vs_inventory = async ({
+  store,
+  include_filenames,
+}: {
+  store: "canon" | "threads" | "all" | string;
+  include_filenames: boolean;
+}) => {
+  const s = encodeURIComponent(String(store ?? "all"));
+  const inc = include_filenames === false ? "0" : "1";
+  return await getJsonPublic(`/api/vs_inventory?store=${s}&include_filenames=${inc}`);
+};
+
 // -------------------- functionsMap --------------------
 // NOTE: keys MUST match sanitized tool names (dots become underscores).
 export const functionsMap = {
@@ -203,6 +224,7 @@ export const functionsMap = {
   fs_patch,
   fs_replace,
   fs_propose_change,
+  vs_inventory,
 } as const;
 
 // Optional: allow calling dotted names defensively (won't be emitted to OpenAI, but safe if any legacy path calls them)

@@ -111,4 +111,20 @@ export const toolsList = [
       additionalProperties: false,
     },
   },
+
+  // ---------- Vector store inventory (read-only) ----------
+  {
+    name: "vs_inventory",
+    description:
+      "List files in vector stores via /api/vs_inventory. Args: store (canon|threads|all), include_filenames (boolean).",
+    parameters: {
+      type: "object",
+      properties: {
+        store: { type: "string", description: 'One of: "canon" | "threads" | "all".' },
+        include_filenames: { type: "boolean", description: "Whether to resolve filenames (default true)." },
+      },
+      required: ["store", "include_filenames"],
+      additionalProperties: false,
+    },
+  },
 ];

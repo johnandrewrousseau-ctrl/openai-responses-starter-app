@@ -1071,6 +1071,31 @@ function isThreadModeExplicit(lastUserText: string): boolean {
   );
 }
 
+function isInventoryIntent(lastUserText: string): boolean {
+  const t = (lastUserText || "").toLowerCase();
+  return (
+    t.includes("list files") ||
+    t.includes("list file") ||
+    t.includes("inventory") ||
+    t.includes("show all docs") ||
+    t.includes("show all documents") ||
+    t.includes("show me all files") ||
+    t.includes("what files do you have") ||
+    t.includes("what documents do you have") ||
+    t.includes("what's in") ||
+    t.includes("whats in") ||
+    t.includes("what is in")
+  );
+}
+
+function pickInventoryStore(lastUserText: string): "canon" | "threads" | "all" {
+  const t = (lastUserText || "").toLowerCase();
+  if (t.includes("all") || t.includes("both")) return "all";
+  if (t.includes("canon")) return "canon";
+  if (t.includes("thread")) return "threads";
+  return "threads";
+}
+
 /**
  * Sanitize tool array so we never send invalid vector_store_ids.
  * - For file_search: remove null/empty IDs
@@ -1333,12 +1358,26 @@ export async function POST(request: Request) {
     request.signal?.addEventListener?.("abort", onRequestAbort, { once: true });
     // ---------- End Phase B2 setup ----------
 
+    const normalized = normalizeMessages(messages);
+    const lastUserText = [...normalized].reverse().find((m) => m.role === "user")?.content || "";
+
         // ---------- Phase B2.25: tool-gating (admin-authorized only) ----------
     const toolsStateObj =
       toolsState !== undefined && toolsState !== null && typeof toolsState === "object" ? (toolsState as any) : {};
 
     const fileSearchEnabled = Boolean(toolsStateObj?.fileSearchEnabled);
     const wantsFunctions = Boolean(toolsStateObj?.functionsEnabled);
+
+    const inventoryModeActive = isInventoryIntent(lastUserText);
+    const inventoryStore = inventoryModeActive ? pickInventoryStore(lastUserText) : "threads";
+    if (inventoryModeActive && !wantsFunctions) {
+      return jsonError(
+        400,
+        "vs_inventory_requires_functions",
+        "Vector store inventory requires toolsState.functionsEnabled=true.",
+        { hint: "Enable toolsState.functionsEnabled for this request." }
+      );
+    }
 
     // Only allow function tools when the request is authorized (admin token) OR dev loopback bypass is active.
     const toolsOk = isToolsAuthorized(request);
@@ -1358,7 +1397,14 @@ export async function POST(request: Request) {
     const extraTools = await getTools(gatedToolsState);
     // ---------- End Phase B2.25 ----------
 
-    const developerPrompt = getDeveloperPrompt();
+    let developerPrompt = getDeveloperPrompt();
+    if (inventoryModeActive) {
+      developerPrompt +=
+        "\n\n[Inventory mode]\n" +
+        `- Call vs_inventory with store="${inventoryStore}" and include_filenames=true.\n` +
+        "- Do not answer before the tool returns.\n" +
+        "- Return the tool result without analysis.";
+    }
 
     const invMarker = "INV_MARKER=INV_2026_01_03_A";
     const invMarkerPresent = developerPrompt.includes(invMarker);
@@ -1544,9 +1590,6 @@ export async function POST(request: Request) {
     const statePack = loadStatePack(statePath);
     const promptStatePack = buildPromptStatePack(statePack);
 
-    const normalized = normalizeMessages(messages);
-    const lastUserText = [...normalized].reverse().find((m) => m.role === "user")?.content || "";
-
     const canonModeActive = isCanonModeExplicit(lastUserText);
     const threadModeActive = isThreadModeExplicit(lastUserText);
     if (canonModeActive && threadModeActive) {
@@ -1559,6 +1602,7 @@ export async function POST(request: Request) {
         }
       );
     }
+
     if (canonModeActive && !fileSearchEnabled) {
       return jsonError(
         400,
@@ -1741,6 +1785,9 @@ export async function POST(request: Request) {
     ];
 
     const origin = new URL(request.url).origin;
+    const inventoryToolChoice = inventoryModeActive
+      ? ({ type: "function", name: "vs_inventory" } as const)
+      : null;
     const canonToolChoice = canonModeActive ? ({ type: "file_search" } as const) : null;
     const threadToolChoice = threadModeActive ? ({ type: "file_search" } as const) : null;
 
@@ -1807,8 +1854,9 @@ assistantText = finalText;
       max_output_tokens: MEKA_BUDGETS.maxOutputTokens,
       stream: true,
       parallel_tool_calls: false,
-      ...(canonToolChoice ? { tool_choice: canonToolChoice } : {}),
-      ...(threadToolChoice ? { tool_choice: threadToolChoice } : {}),
+      ...(inventoryToolChoice ? { tool_choice: inventoryToolChoice } : {}),
+      ...(!inventoryToolChoice && canonToolChoice ? { tool_choice: canonToolChoice } : {}),
+      ...(!inventoryToolChoice && threadToolChoice ? { tool_choice: threadToolChoice } : {}),
     });
 
     // Streaming writeback suppression state (must exist, or takeVisibleFromDelta will crash)

@@ -83,6 +83,13 @@ type FileItem = {
   created_at: number;
 };
 
+function normalizeFilename(name: string): string {
+  let n = String(name || "").trim();
+  n = n.replace(/\s+/g, " ");
+  n = n.replace(/\s+(\.[a-z0-9]+)$/i, "$1");
+  return n.toLowerCase();
+}
+
 export async function POST(request: Request) {
   const auth = requireAdmin(request);
   if (auth) return auth;
@@ -159,7 +166,7 @@ export async function POST(request: Request) {
 
   const byName = new Map<string, FileItem[]>();
   for (const f of allFiles) {
-    const key = f.filename || "";
+    const key = normalizeFilename(f.filename || "");
     const list = byName.get(key) || [];
     list.push(f);
     byName.set(key, list);

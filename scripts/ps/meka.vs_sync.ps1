@@ -30,7 +30,7 @@ if (-not $token) {
 }
 
 function Invoke-Ingest($store) {
-  $body = @{ store = $store; replace = $true } | ConvertTo-Json
+  $body = @{ store = $store; replace = $true; reconcile = $true } | ConvertTo-Json
   $headers = @{ Authorization = ("Bearer " + $token) }
   $resp = Invoke-WebRequest "http://localhost:3000/api/vs_ingest" -Method Post -Headers $headers -ContentType "application/json" -Body $body -SkipHttpErrorCheck -TimeoutSec 120
   if ($resp.StatusCode -ne 200) {

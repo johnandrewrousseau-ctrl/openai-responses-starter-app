@@ -9,6 +9,7 @@ type Body = {
   store?: "threads" | "canon";
   max_files?: number;
   replace?: boolean;
+  reconcile?: boolean;
 };
 
 function json(body: any, status = 200) {
@@ -91,6 +92,12 @@ function pickSourceDir(store: "threads" | "canon"): string {
   return (process.env.MEKA_THREADS_TXT_DIR || "").trim() || "C:\\meka\\MEKA_THREADS_TXT";
 }
 
+function startsWithPathInsensitive(fullPath: string, root: string): boolean {
+  const a = String(fullPath || "").toLowerCase();
+  const b = String(root || "").toLowerCase();
+  return a.startsWith(b);
+}
+
 export async function POST(request: Request) {
   const auth = requireAdmin(request);
   if (auth) return auth;
@@ -118,6 +125,7 @@ export async function POST(request: Request) {
       ? Math.floor(body.max_files)
       : 10000;
   const replace = typeof body.replace === "boolean" ? body.replace : true;
+  const reconcile = typeof body.reconcile === "boolean" ? body.reconcile : true;
 
   const statePath = path.join(process.cwd(), "state", "vs_ingest_state.json");
   const state = readState(statePath);
@@ -127,6 +135,7 @@ export async function POST(request: Request) {
     .map((n) => path.join(sourceDir, n))
     .filter((p) => fs.existsSync(p) && fs.statSync(p).isFile() && allowedExt(p))
     .slice(0, maxFiles);
+  const currentPaths = new Set(files.map((p) => String(p)));
 
   const openai = getOpenAI();
 
@@ -136,6 +145,25 @@ export async function POST(request: Request) {
   let skipped = 0;
   let replaced = 0;
   const failures: Array<{ file: string; error: string }> = [];
+  let detachedMissing = 0;
+
+  if (reconcile) {
+    const entries = state.files && typeof state.files === "object" ? state.files : {};
+    for (const p of Object.keys(entries)) {
+      if (!startsWithPathInsensitive(p, sourceDir)) continue;
+      if (currentPaths.has(p)) continue;
+      const fileId = String(entries[p]?.file_id || "").trim();
+      if (fileId) {
+        try {
+          await openai.vectorStores.files.del(vectorStoreId, fileId);
+          detachedMissing++;
+        } catch (e: any) {
+          failures.push({ file: p, error: "detach_missing_failed: " + String(e?.message ?? e) });
+        }
+      }
+      delete state.files[p];
+    }
+  }
 
   for (const fullPath of files) {
     scanned++;
@@ -202,6 +230,7 @@ export async function POST(request: Request) {
       skipped,
       replaced,
       failures,
+      detached_missing: detachedMissing,
     },
     200
   );

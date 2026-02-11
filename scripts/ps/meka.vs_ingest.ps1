@@ -37,6 +37,7 @@ if (-not $token) {
 $body = @{
   store = $Store
   replace = [bool]$Replace.IsPresent
+  reconcile = $true
 } | ConvertTo-Json
 
 $headers = @{ Authorization = ("Bearer " + $token) }

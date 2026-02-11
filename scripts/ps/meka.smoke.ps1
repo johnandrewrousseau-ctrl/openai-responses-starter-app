@@ -84,7 +84,8 @@ function Invoke-TurnResponse {
     -ContentType "application/json" `
     -Body $BodyJson `
     -Headers $Headers `
-    -SkipHttpErrorCheck
+    -SkipHttpErrorCheck `
+    -TimeoutSec 30
 }
 
 # Repo root is two levels above scripts/ps/
@@ -92,7 +93,7 @@ $Root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $fixtures = Join-Path $Root "meka\fixtures\turn_requests"
 
 # 0) Server readiness
-$ts = Invoke-WebRequest "$Base/api/tool_status" -Method Get -SkipHttpErrorCheck
+$ts = Invoke-WebRequest "$Base/api/tool_status" -Method Get -SkipHttpErrorCheck -TimeoutSec 30
 Assert-True ($ts.StatusCode -eq 200) "server_ready" "GET /api/tool_status expected 200, got $($ts.StatusCode)"
 
 # 1) Baseline: tools off
@@ -153,7 +154,7 @@ Assert-True ($resp1b.StatusCode -eq 400) "tools_state_rejects_extra" "Expected 4
 # 1.7) Vector store audit must succeed
 $auditToken = Read-EnvValue (Join-Path $Root ".env.local") "MEKA_ADMIN_TOKEN"
 $auditHeaders = @{ Authorization = ("Bearer " + $auditToken) }
-$respAudit = Invoke-WebRequest "$Base/api/vs_audit?store=all" -Method Get -Headers $auditHeaders -SkipHttpErrorCheck
+$respAudit = Invoke-WebRequest "$Base/api/vs_audit?store=all" -Method Get -Headers $auditHeaders -SkipHttpErrorCheck -TimeoutSec 30
 Assert-True ($respAudit.StatusCode -eq 200) "vs_audit_http_200" "Expected 200 from /api/vs_audit. Got $($respAudit.StatusCode)"
 
 $auditJson = $respAudit.Content | ConvertFrom-Json

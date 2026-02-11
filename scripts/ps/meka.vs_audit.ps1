@@ -3,7 +3,8 @@ param(
   [string]$Store = "all",
   [string]$Query = "drift countermeasure",
   [int]$Limit = 5,
-  [string]$OutPath = ".\\meka\\out\\vs_audit.json"
+  [string]$OutPath = ".\\meka\\out\\vs_audit.json",
+  [switch]$Names
 )
 
 Set-StrictMode -Version Latest
@@ -34,8 +35,14 @@ function Print-StoreSummary {
   $total = $Obj.files_total
   $pages = $Obj.pages_fetched
   $snap = $Obj.snapshot_sha256
+  $resolved = $Obj.filenames_resolved
+  $missing = $Obj.filenames_missing
+  $capped = $Obj.filenames_resolution_capped
   Write-Host ("{0}: {1} (files_total={2}, pages_fetched={3})" -f $Name, $id, $total, $pages)
   if ($snap) { Write-Host ("snapshot_sha256: " + $snap) }
+  if ($null -ne $resolved -or $null -ne $missing) {
+    Write-Host ("filenames_resolved={0} filenames_missing={1} capped={2}" -f $resolved, $missing, $capped)
+  }
 
   $hits = @()
   if ($Obj.search_probe -and $Obj.search_probe.results) {
@@ -48,6 +55,13 @@ function Print-StoreSummary {
   if ($hits.Count -gt 0) {
     $uniq = $hits | Select-Object -Unique
     Write-Host ("top probe hits: " + ($uniq -join ", "))
+  }
+
+  $names = @($Obj.files | % { $_.filename }) | ? { $_ } | Sort-Object -Unique
+  $namesCount = @($names).Count
+  if ($namesCount -gt 0) {
+    $preview = $names | Select-Object -First 20
+    Write-Host ("filenames preview ({0}): {1}" -f $namesCount, ($preview -join ", "))
   }
 }
 
@@ -62,7 +76,8 @@ if (-not $token) {
 
 $headers = @{ Authorization = ("Bearer " + $token) }
 $url = "$Base/api/vs_audit?store=$Store&q=$Query&limit=$Limit"
-$resp = Invoke-WebRequest $url -Method Get -Headers $headers -SkipHttpErrorCheck
+if ($Names) { $url = $url + "&names=1" }
+$resp = Invoke-WebRequest $url -Method Get -Headers $headers -SkipHttpErrorCheck -TimeoutSec 30
 
 if ($resp.StatusCode -ne 200) {
   Write-Host "HTTP $($resp.StatusCode)"

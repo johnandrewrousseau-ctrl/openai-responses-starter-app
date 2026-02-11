@@ -117,8 +117,7 @@ export async function POST(request: Request) {
     typeof body.max_files === "number" && Number.isFinite(body.max_files) && body.max_files > 0
       ? Math.floor(body.max_files)
       : 10000;
-  const replace =
-    typeof body.replace === "boolean" ? body.replace : store === "canon";
+  const replace = typeof body.replace === "boolean" ? body.replace : true;
 
   const statePath = path.join(process.cwd(), "state", "vs_ingest_state.json");
   const state = readState(statePath);
@@ -157,6 +156,18 @@ export async function POST(request: Request) {
       const blob = new Blob([buf], { type: "application/octet-stream" });
       const fileName = path.basename(fullPath);
 
+      if (replace && prev?.file_id) {
+        try {
+          await openai.vectorStores.files.del(vectorStoreId, prev.file_id);
+          replaced++;
+        } catch (e: any) {
+          failures.push({
+            file: fullPath,
+            error: "detach_failed: " + String(e?.message ?? e),
+          });
+        }
+      }
+
       const uploadedFile = await openai.files.create({
         file: new File([blob], fileName),
         purpose: "assistants",
@@ -170,18 +181,6 @@ export async function POST(request: Request) {
 
       await openai.vectorStores.files.create(vectorStoreId, { file_id: newFileId } as any);
       attached++;
-
-      if (replace && prev?.file_id && prev.file_id !== newFileId) {
-        try {
-          await openai.vectorStores.files.del(vectorStoreId, prev.file_id);
-          replaced++;
-        } catch (e: any) {
-          failures.push({
-            file: fullPath,
-            error: "detach_failed: " + String(e?.message ?? e),
-          });
-        }
-      }
 
       state.files[fullPath] = { sha256: sha, file_id: newFileId };
     } catch (e: any) {

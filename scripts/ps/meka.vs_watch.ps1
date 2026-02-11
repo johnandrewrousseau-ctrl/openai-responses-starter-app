@@ -1,6 +1,7 @@
 param(
   [string]$Base = "http://localhost:3000",
-  [ValidateSet("threads","canon")][string]$Store = "threads"
+  [ValidateSet("threads","canon")][string]$Store = "threads",
+  [switch]$Replace
 )
 
 Set-StrictMode -Version Latest
@@ -54,7 +55,11 @@ $action = {
   $now = Get-Date
   if (($now - $script:LastEvent).TotalSeconds -lt 2) { return }
   $script:LastEvent = $now
-  pwsh .\scripts\ps\meka.vs_ingest.ps1 -Base $using:Base -Store $using:Store | Out-Host
+  if ($using:Replace) {
+    pwsh .\scripts\ps\meka.vs_ingest.ps1 -Base $using:Base -Store $using:Store -Replace | Out-Host
+  } else {
+    pwsh .\scripts\ps\meka.vs_ingest.ps1 -Base $using:Base -Store $using:Store | Out-Host
+  }
 }
 
 Register-ObjectEvent -InputObject $fsw -EventName Created -Action $action | Out-Null

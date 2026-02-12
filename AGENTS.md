@@ -83,3 +83,8 @@ CODE RED handling:
 Output format requirements:
 - Always show: `git status -sb`, `git diff --stat`, smoke PASS/FAIL line(s), commit message, push result.
 - Never ask the user to paste tool output; Codex must obtain needed truth via commands.
+
+## Operator commands
+- Daily command: `pwsh -File .\scripts\ps\meka.up.ps1`
+- Expected PASS lines: `server_ready`, `watch_threads_started`, `watch_canon_started`, `smoke_ok`, `meka_up_ready`.
+- Stop behavior: Ctrl+C exits and terminates child processes (server + watchers).

@@ -66,3 +66,20 @@ From repo root:
   - the invariant being protected
   - what harness check proves it
   - what files you will touch (minimum set)
+
+## Dual-Agent Zero-Trust Fast Loop (Repo Standard)
+Role split:
+- ChatGPT = Conceptual Lead/QA; produces invariants/tests/stop-conditions + CODEX TASK blocks.
+- Codex = Technical Architect/Lead Dev; adversarial audit first for YELLOW/RED; then implement + run proofs.
+
+Risk tiers:
+- GREEN: implement immediately.
+- YELLOW: 3 failure modes + 3 optimizations then implement.
+- RED: same as YELLOW + stricter stop conditions + explicit proofs.
+
+CODE RED handling:
+- Freeze changes, output drift audit (ask/now/next/codex-task), no backlog resurrection.
+
+Output format requirements:
+- Always show: `git status -sb`, `git diff --stat`, smoke PASS/FAIL line(s), commit message, push result.
+- Never ask the user to paste tool output; Codex must obtain needed truth via commands.

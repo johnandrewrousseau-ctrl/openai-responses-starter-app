@@ -1,0 +1,6 @@
+# Project-scoped config loads when the project is trusted.
+approval_policy = "never"
+web_search = "cached"
+
+[tui]
+animations = false

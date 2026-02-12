@@ -1,7 +1,8 @@
 Param(
   [string]$TaskFile = "",
   [string]$Task = "",
-  [string]$Sandbox = "workspace-write"
+  [string]$Sandbox = "workspace-write",
+  [switch]$Json
 )
 
 Set-StrictMode -Version Latest
@@ -25,13 +26,38 @@ if (-not $codexCmd) {
   exit 3
 }
 
-& codex exec --full-auto --sandbox $Sandbox $Task
+if ($Json) {
+  & codex exec --full-auto --sandbox $Sandbox --json $Task 2>&1 | Tee-Object -Variable codexOut
+} else {
+  & codex exec --full-auto --sandbox $Sandbox $Task 2>&1 | Tee-Object -Variable codexOut
+}
 $exitCode = $LASTEXITCODE
 
+$effectiveSandbox = $null
+if ($codexOut) {
+  foreach ($line in $codexOut) {
+    if ($line -match "sandbox:\s*([A-Za-z\-]+)") {
+      $effectiveSandbox = $Matches[1]
+      break
+    }
+    if ($line -match "`"sandbox`"\\s*:\\s*`"([^`"]+)`"") {
+      $effectiveSandbox = $Matches[1]
+      break
+    }
+  }
+}
+
+if ($effectiveSandbox) {
+  if ($effectiveSandbox.ToLowerInvariant() -ne $Sandbox.ToLowerInvariant()) {
+    Write-Host ("FAIL [codex_exec_sandbox_mismatch] expected={0} actual={1}" -f $Sandbox, $effectiveSandbox)
+    exit 4
+  }
+}
+
 if ($exitCode -eq 0) {
-  Write-Host "PASS: codex exec"
+  Write-Host "PASS [codex_exec_ok] exit=$exitCode"
   exit 0
 }
 
-Write-Host "FAIL: codex exec"
+Write-Host "FAIL [codex_exec_fail] exit=$exitCode"
 exit $exitCode

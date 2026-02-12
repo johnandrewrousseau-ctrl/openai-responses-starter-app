@@ -2,7 +2,8 @@ Param(
   [string]$TaskFile = "",
   [string]$Task = "",
   [string]$Sandbox = "workspace-write",
-  [switch]$Json
+  [switch]$Json,
+  [switch]$RequireSandbox
 )
 
 Set-StrictMode -Version Latest
@@ -47,9 +48,19 @@ if ($codexOut) {
   }
 }
 
-if ($effectiveSandbox) {
-  if ($effectiveSandbox.ToLowerInvariant() -ne $Sandbox.ToLowerInvariant()) {
-    Write-Host ("FAIL [codex_exec_sandbox_mismatch] expected={0} actual={1}" -f $Sandbox, $effectiveSandbox)
+if ($RequireSandbox -and $Sandbox -eq "workspace-write") {
+  $outText = ""
+  if ($codexOut) { $outText = ($codexOut -join "`n") }
+  $looksReadOnly = $false
+  if ($effectiveSandbox -and $effectiveSandbox.ToLowerInvariant() -ne $Sandbox.ToLowerInvariant()) {
+    $looksReadOnly = $true
+  }
+  if ($outText -match "sandbox:\s*read-only" -or $outText -match "blocked by policy" -or $outText -match "read-only") {
+    $looksReadOnly = $true
+  }
+  if ($looksReadOnly) {
+    $actual = if ($effectiveSandbox) { $effectiveSandbox } else { "read-only" }
+    Write-Host ("FAIL [codex_exec_sandbox_mismatch] requested={0} effective={1}" -f $Sandbox, $actual)
     exit 4
   }
 }

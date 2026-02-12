@@ -15,15 +15,15 @@ if ([string]::IsNullOrWhiteSpace($Base)) {
 
 function Write-Pass {
   param([string]$Name)
-  Write-Host ("PASS [{0}]" -f $Name)
+  Write-Output ("PASS [{0}]" -f $Name)
 }
 
 function Write-Fail {
   param([string]$Name, [string]$Msg, [int]$ExitCode = 1)
   if ($Msg) {
-    Write-Host ("FAIL [{0}] {1}" -f $Name, $Msg)
+    Write-Output ("FAIL [{0}] {1}" -f $Name, $Msg)
   } else {
-    Write-Host ("FAIL [{0}]" -f $Name)
+    Write-Output ("FAIL [{0}]" -f $Name)
   }
   exit $ExitCode
 }
@@ -38,7 +38,7 @@ function Stop-Children {
 }
 
 function Wait-ServerReady {
-  param([string]$BaseUrl, [int]$TimeoutSec = 90)
+  param([string]$BaseUrl, [int]$TimeoutSec = 180)
   $sw = [Diagnostics.Stopwatch]::StartNew()
   while ($sw.Elapsed.TotalSeconds -lt $TimeoutSec) {
     try {
@@ -51,9 +51,9 @@ function Wait-ServerReady {
 }
 
 function Get-DevCommand {
-  if (Test-Path (Join-Path $Root "pnpm-lock.yaml")) { return @{ FilePath = "pnpm"; Args = @("dev") } }
-  if (Test-Path (Join-Path $Root "yarn.lock")) { return @{ FilePath = "yarn"; Args = @("dev") } }
-  return @{ FilePath = "npm"; Args = @("run", "dev") }
+  if (Test-Path (Join-Path $Root "pnpm-lock.yaml")) { return @{ FilePath = "cmd.exe"; Args = @("/c", "pnpm dev") } }
+  if (Test-Path (Join-Path $Root "yarn.lock")) { return @{ FilePath = "cmd.exe"; Args = @("/c", "yarn dev") } }
+  return @{ FilePath = "cmd.exe"; Args = @("/c", "npm run dev") }
 }
 
 $childProcs = @()
@@ -62,14 +62,33 @@ try {
   & pwsh -File .\scripts\ps\meka.killport.ps1 -Port $Port | Out-Host
 
   $dev = Get-DevCommand
-  $serverProc = Start-Process -FilePath $dev.FilePath -ArgumentList $dev.Args -WorkingDirectory $Root -PassThru
+  $logDir = Join-Path $Root "state"
+  if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
+  $serverLog = Join-Path $logDir "meka.up.server.log"
+  $serverErr = Join-Path $logDir "meka.up.server.err.log"
+  $serverProc = Start-Process -FilePath $dev.FilePath -ArgumentList $dev.Args -WorkingDirectory $Root -PassThru -RedirectStandardOutput $serverLog -RedirectStandardError $serverErr
   $childProcs += $serverProc
 
-  if (-not (Wait-ServerReady -BaseUrl $Base -TimeoutSec 120)) {
+  Start-Sleep -Seconds 2
+  if ($serverProc.HasExited) {
+    Stop-Children -Procs $childProcs
+    Write-Fail "server_start_failed" "Dev server exited early. Check $serverLog and $serverErr."
+  }
+
+  if (-not (Wait-ServerReady -BaseUrl $Base -TimeoutSec 180)) {
     Stop-Children -Procs $childProcs
     Write-Fail "server_ready" "Server did not become ready at $Base/api/tool_status."
   }
   Write-Pass "server_ready"
+
+  $syncLog = Join-Path $logDir "meka.up.vs_sync.log"
+  & pwsh -File .\scripts\ps\meka.vs_sync.ps1 2>&1 | Set-Content -Path $syncLog -Encoding UTF8
+  $syncExit = $LASTEXITCODE
+  if ($syncExit -ne 0) {
+    Stop-Children -Procs $childProcs
+    Write-Fail "vs_sync_failed" "Initial vector store sync failed. Check $syncLog." $syncExit
+  }
+  Write-Pass "vs_sync_ok"
 
   $watchThreads = Start-Process -FilePath "pwsh" -ArgumentList @("-File", ".\scripts\ps\meka.vs_watch.ps1", "-Base", $Base, "-Store", "threads") -WorkingDirectory $Root -PassThru
   $childProcs += $watchThreads
@@ -79,11 +98,12 @@ try {
   $childProcs += $watchCanon
   Write-Pass "watch_canon_started"
 
-  & pwsh -File .\scripts\ps\meka.smoke.ps1 -Base $Base | Out-Host
+  $smokeLog = Join-Path $logDir "meka.up.smoke.log"
+  & pwsh -File .\scripts\ps\meka.smoke.ps1 -Base $Base 2>&1 | Set-Content -Path $smokeLog -Encoding UTF8
   $smokeExit = $LASTEXITCODE
   if ($smokeExit -ne 0) {
     Stop-Children -Procs $childProcs
-    Write-Fail "meka_up_smoke" "Smoke failed." $smokeExit
+    Write-Fail "meka_up_smoke" "Smoke failed. Check $smokeLog." $smokeExit
   }
   Write-Pass "smoke_ok"
   Write-Pass "meka_up_ready"

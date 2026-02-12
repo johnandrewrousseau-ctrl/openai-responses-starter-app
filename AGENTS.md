@@ -86,5 +86,11 @@ Output format requirements:
 
 ## Operator commands
 - Daily command: `pwsh -File .\scripts\ps\meka.up.ps1`
+- Secondary commands:
+`pwsh -File .\scripts\ps\meka.smoke.ps1`
+`pwsh -File .\scripts\ps\meka.vs_sync.ps1`
+- For write tasks: `pwsh -File .\scripts\ps\meka.codex.exec.ps1 -Sandbox workspace-write -RequireSandbox`
+- Logs: `state\meka.up.server.log`, `state\meka.up.server.err.log`
+- Logs: `state\meka.up.vs_sync.log`, `state\meka.up.smoke.log`
 - Expected PASS lines: `server_ready`, `watch_threads_started`, `watch_canon_started`, `smoke_ok`, `meka_up_ready`.
 - Stop behavior: Ctrl+C exits and terminates child processes (server + watchers).

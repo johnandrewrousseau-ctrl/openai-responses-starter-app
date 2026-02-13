@@ -2,6 +2,8 @@ Param(
   [string]$TaskFile = "",
   [string]$Task = "",
   [string]$Sandbox = "workspace-write",
+  [ValidateSet("never","on-request","untrusted")]
+  [string]$Approval = "never",
   [switch]$Json,
   [switch]$RequireSandbox
 )
@@ -13,7 +15,7 @@ Set-Location C:\meka\meka-ui
 $Root = (Resolve-Path ".").Path
 
 if ([string]::IsNullOrWhiteSpace($Task) -and [string]::IsNullOrWhiteSpace($TaskFile)) {
-  Write-Host "FAIL: Provide -Task or -TaskFile."
+  Write-Host "FAIL [codex_exec_fail] exit=2 err=missing_task"
   exit 2
 }
 
@@ -23,15 +25,45 @@ if (-not [string]::IsNullOrWhiteSpace($TaskFile)) {
 
 $codexCmd = Get-Command codex -ErrorAction SilentlyContinue
 if (-not $codexCmd) {
-  Write-Host "FAIL: codex not found on PATH. Install or fix PATH, then retry."
+  Write-Host "FAIL [codex_exec_fail] exit=3 err=codex_not_found"
   exit 3
 }
 
-if ($Json) {
-  & codex exec --full-auto --sandbox $Sandbox --json $Task 2>&1 | Tee-Object -Variable codexOut
-} else {
-  & codex exec --full-auto --sandbox $Sandbox $Task 2>&1 | Tee-Object -Variable codexOut
+$helpText = ""
+try {
+  $helpText = (& codex exec --help 2>&1 | Out-String)
+} catch {
+  $helpText = ""
 }
+
+$hasSandbox = ($helpText -match "(?m)^\s*--sandbox(?:[\s=]|$)")
+$hasFullAuto = ($helpText -match "(?m)^\s*--full-auto(?:[\s=]|$)")
+$hasJson = ($helpText -match "(?m)^\s*--json(?:[\s=]|$)")
+
+$approvalFlag = $null
+foreach ($candidate in @("--ask-for-approval", "--approval-mode", "--approval-policy", "--approval")) {
+  if ($helpText -match ("(?m)^\s*{0}(?:[\s=]|$)" -f [regex]::Escape($candidate))) {
+    $approvalFlag = $candidate
+    break
+  }
+}
+
+$execArgs = @("exec")
+if ($hasFullAuto) {
+  $execArgs += "--full-auto"
+}
+if ($hasSandbox) {
+  $execArgs += @("--sandbox", $Sandbox)
+}
+if ($approvalFlag) {
+  $execArgs += @($approvalFlag, $Approval)
+}
+if ($Json -and $hasJson) {
+  $execArgs += "--json"
+}
+$execArgs += $Task
+
+& codex @execArgs 2>&1 | Tee-Object -Variable codexOut | Out-Null
 $exitCode = $LASTEXITCODE
 
 $effectiveSandbox = $null
@@ -48,19 +80,23 @@ if ($codexOut) {
   }
 }
 
-if ($RequireSandbox -and $Sandbox -eq "workspace-write") {
+if ($RequireSandbox) {
   $outText = ""
   if ($codexOut) { $outText = ($codexOut -join "`n") }
   $looksReadOnly = $false
+  $hasMismatch = $false
   if ($effectiveSandbox -and $effectiveSandbox.ToLowerInvariant() -ne $Sandbox.ToLowerInvariant()) {
-    $looksReadOnly = $true
+    $hasMismatch = $true
   }
   if ($outText -match "sandbox:\s*read-only" -or $outText -match "blocked by policy" -or $outText -match "read-only") {
     $looksReadOnly = $true
   }
-  if ($looksReadOnly) {
-    $actual = if ($effectiveSandbox) { $effectiveSandbox } else { "read-only" }
-    Write-Host ("FAIL [codex_exec_sandbox_mismatch] requested={0} effective={1}" -f $Sandbox, $actual)
+  if ($looksReadOnly -and $Sandbox.ToLowerInvariant() -ne "read-only") {
+    $hasMismatch = $true
+  }
+  if ($hasMismatch) {
+    $effective = if ($effectiveSandbox) { $effectiveSandbox } elseif ($looksReadOnly) { "read-only" } else { "unknown" }
+    Write-Host ("FAIL [codex_exec_sandbox_mismatch] requested={0} effective={1}" -f $Sandbox, $effective)
     exit 4
   }
 }
@@ -70,5 +106,23 @@ if ($exitCode -eq 0) {
   exit 0
 }
 
-Write-Host "FAIL [codex_exec_fail] exit=$exitCode"
+$firstErrorLine = ""
+if ($codexOut) {
+  foreach ($line in $codexOut) {
+    $trimmed = "$line".Trim()
+    if ([string]::IsNullOrWhiteSpace($trimmed)) { continue }
+    if ($trimmed -match "(?i)\b(error|failed|failure|invalid|unknown|usage)\b") {
+      $firstErrorLine = $trimmed
+      break
+    }
+    if (-not $firstErrorLine) {
+      $firstErrorLine = $trimmed
+    }
+  }
+}
+if (-not $firstErrorLine) {
+  $firstErrorLine = "codex_exec_failed"
+}
+
+Write-Host ("FAIL [codex_exec_fail] exit={0} err={1}" -f $exitCode, $firstErrorLine)
 exit $exitCode

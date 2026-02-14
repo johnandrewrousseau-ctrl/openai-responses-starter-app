@@ -112,20 +112,13 @@ try {
     return
   }
 
-  $script:stopRequested = $false
-  $null = Register-EngineEvent -SourceIdentifier "PowerShell.Exiting" -Action { $script:stopRequested = $true }
-  [console]::CancelKeyPress += {
-    $script:stopRequested = $true
-    $_.Cancel = $true
+  # Keepalive: block until the dev server exits. Ctrl+C triggers finally cleanup.
+  try {
+    while ($serverProc -and -not $serverProc.HasExited) { Start-Sleep -Seconds 1 }
+  } catch [System.Management.Automation.PipelineStoppedException] {
+    # Ctrl+C / host stop; cleanup runs in finally.
   }
 
-  while (-not $script:stopRequested) {
-    if ($serverProc.HasExited) {
-      $script:stopRequested = $true
-      break
-    }
-    Start-Sleep -Seconds 1
-  }
 }
 finally {
   Stop-Children -Procs $childProcs
